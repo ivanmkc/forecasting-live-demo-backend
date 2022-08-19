@@ -17,10 +17,12 @@ import uuid
 
 app = FastAPI()
 
+datasets = [dataset.to_dict() for dataset in dataset_service.get_datasets()]
+
 
 @app.get("/get_datasets")
 async def get_datasets():
-    return [dataset.to_dict() for dataset in dataset_service.get_datasets()]
+    return datasets
 
 
 @app.get("/get_dataset/{dataset_id}")
