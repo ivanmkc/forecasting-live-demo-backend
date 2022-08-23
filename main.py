@@ -14,17 +14,23 @@ logger = logging.getLogger(__name__)
 
 import os
 import uuid
+from services import dataset_service
 
 app = FastAPI()
-
-datasets = [dataset.to_dict() for dataset in dataset_service.get_datasets()]
 
 
 @app.get("/get_datasets")
 async def get_datasets():
-    return datasets
+    return [dataset.to_dict() for dataset in dataset_service.get_datasets()]
 
 
 @app.get("/get_dataset/{dataset_id}")
 def get_dataset(dataset_id: int):
     return {}
+
+
+# TODO: Train a model
+# BQML ARIMA+
+# Vertex AI forecasting
+
+# TODO: Get historical forecasts (and pending jobs)
