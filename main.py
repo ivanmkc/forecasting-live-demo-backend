@@ -26,8 +26,9 @@ async def get_datasets():
 
 
 @app.get("/get_dataset/{dataset_id}")
-def get_dataset(dataset_id: int):
-    return {}
+def get_dataset(dataset_id: str):
+  target_dataset = dataset_service.get_dataset(dataset_id)
+  return target_dataset
 
 @app.get("/preview_dataset/{dataset_id}")
 def preview_dataset(dataset_id: str):
