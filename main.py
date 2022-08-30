@@ -1,3 +1,4 @@
+from queue import Empty
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse
 
@@ -27,6 +28,16 @@ async def get_datasets():
 @app.get("/get_dataset/{dataset_id}")
 def get_dataset(dataset_id: int):
     return {}
+
+@app.get("/preview_dataset/{dataset_id}")
+def preview_dataset(dataset_id: str):
+
+    target_dataset = dataset_service.get_dataset(dataset_id)
+
+    if target_dataset is not None:
+      return target_dataset.df_preview.to_dict("records")
+    else:
+      return None
 
 
 # TODO: Train a model
