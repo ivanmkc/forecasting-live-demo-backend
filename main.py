@@ -40,6 +40,15 @@ def preview_dataset(dataset_id: str):
     else:
       return None
 
+@app.get("/dataset_data/{dataset_id}")
+def get_dataset_data(dataset_id):
+  target_dataset = dataset_service.get_dataset(dataset_id)
+
+  if target_dataset is not None:
+    return target_dataset.df.to_json()
+  else:
+    return None
+
 
 # TODO: Train a model
 # BQML ARIMA+
