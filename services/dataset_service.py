@@ -1,7 +1,9 @@
+from typing import List, Optional
+
 from models import dataset
-from typing import List
+
 import logging
-from typing import Optional
+from typing import List, Optional
 
 DATASETS = [
     dataset.CSVDataset(
@@ -24,18 +26,19 @@ DATASETS = [
 def get_datasets() -> List[dataset.Dataset]:
     return DATASETS
 
+
 def get_dataset(dataset_id: str) -> Optional[dataset.Dataset]:
-  """This functions returns a dataset based on the dataset id as input."""
+    """This functions returns a dataset based on the dataset id as input."""
 
-  target_dataset = None
+    target_dataset = None
 
-  for dataset in get_datasets():
-    if str(dataset.id) == dataset_id:
-      target_dataset = dataset
-      break
+    for dataset in get_datasets():
+        if str(dataset.id) == dataset_id:
+            target_dataset = dataset
+            break
 
-  if target_dataset is not None:
-    return target_dataset
-  else:
-    logging.error(f"Dataset id {dataset_id} does not exist!")
-    return None
+    if target_dataset is not None:
+        return target_dataset
+    else:
+        logging.error(f"Dataset id {dataset_id} does not exist!")
+        return None
