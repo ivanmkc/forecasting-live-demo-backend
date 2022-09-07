@@ -24,7 +24,7 @@ DATASETS = [
 def get_datasets() -> List[dataset.Dataset]:
     return DATASETS
 
-def get_dataset(dataset_id) -> Union[dataset.Dataset, None]:
+def get_dataset(dataset_id: str) -> Union[dataset.Dataset, None]:
   """This functions returns a dataset based on the dataset id as input."""
 
   target_dataset = None

@@ -41,7 +41,7 @@ def preview_dataset(dataset_id: str):
       return None
 
 @app.get("/dataset_data/{dataset_id}")
-def get_dataset_data(dataset_id):
+def get_dataset_data(dataset_id: str):
   target_dataset = dataset_service.get_dataset(dataset_id)
 
   if target_dataset is not None:
