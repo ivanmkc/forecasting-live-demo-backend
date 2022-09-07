@@ -1,7 +1,7 @@
 from models import dataset
 from typing import List
 import logging
-from typing import Union
+from typing import Optional
 
 DATASETS = [
     dataset.CSVDataset(
@@ -24,7 +24,7 @@ DATASETS = [
 def get_datasets() -> List[dataset.Dataset]:
     return DATASETS
 
-def get_dataset(dataset_id: str) -> Union[dataset.Dataset, None]:
+def get_dataset(dataset_id: str) -> Optional[dataset.Dataset]:
   """This functions returns a dataset based on the dataset id as input."""
 
   target_dataset = None
