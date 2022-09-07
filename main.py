@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile
+from queue import Empty
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 
 from starlette.background import BackgroundTask
@@ -25,8 +26,31 @@ async def get_datasets():
 
 
 @app.get("/get_dataset/{dataset_id}")
-def get_dataset(dataset_id: int):
-    return {}
+def get_dataset(dataset_id: str):
+  target_dataset = dataset_service.get_dataset(dataset_id)
+  if target_dataset is None:
+    raise HTTPException(status_code=404, detail=f"Dataset id {dataset_id} was not found!")
+  else:
+    return target_dataset
+
+@app.get("/preview_dataset/{dataset_id}")
+def preview_dataset(dataset_id: str):
+
+    target_dataset = dataset_service.get_dataset(dataset_id)
+
+    if target_dataset is None:
+      raise HTTPException(status_code=404, detail=f"Dataset id {dataset_id} was not found!")
+    else:
+      return target_dataset.df_preview.to_dict("records")
+
+@app.get("/dataset_data/{dataset_id}")
+def get_dataset_data(dataset_id: str):
+  target_dataset = dataset_service.get_dataset(dataset_id)
+
+  if target_dataset is None:
+    raise HTTPException(status_code=404, detail=f"Dataset id {dataset_id} was not found!")
+  else:
+    return target_dataset.df.to_json()
 
 
 # TODO: Train a model
