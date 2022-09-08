@@ -28,7 +28,7 @@ training_jobs_manager_instance = training_jobs_manager.MemoryTrainingJobManager(
 
 
 @app.get("/datasets")
-async def get_datasets():
+async def datasets():
     return [dataset.to_dict() for dataset in dataset_service.get_datasets()]
 
 
@@ -73,26 +73,19 @@ def train(request: TrainRequest):
             status_code=404, detail=f"Dataset not found: {request.dataset_id}"
         )
 
-    train_method = training_registry.get(request.type)
-
-    if train_method:
-        # try:
-        job_id = training_jobs_manager_instance.queue(
+    job_id = training_jobs_manager_instance.enqueue(
+        training_jobs_manager.TrainingJobManagerRequest(
+            training_method=request.type,
             dataset=dataset,
-            time_column=request.time_column,
-            target_column=request.target_column,
-            time_series_id_column=request.time_series_id_column,
+            parameters={
+                "time_column": request.time_column,
+                "target_column": request.target_column,
+                "time_series_id_column": request.time_series_id_column,
+            },
         )
+    )
 
-        # TODO: Log job_id
-
-        return job_id
-        # except Exception as exception:
-        #     raise FastAPIHTTPException(status_code=500, detail=str(exception))
-    else:
-        raise HTTPException(
-            status_code=404, detail=f"Training method not supported: {request.type}"
-        )
+    return {"job_id": job_id}
 
 
 # Vertex AI forecasting

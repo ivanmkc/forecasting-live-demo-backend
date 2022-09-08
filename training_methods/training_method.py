@@ -1,14 +1,16 @@
 import abc
 
+import datetime
 from google.cloud import bigquery
 
 import utils
-from models import dataset
+from models import dataset, forecast
+from typing import Any, Dict
 
 
 class TrainingMethod(abc.ABC):
     @abc.abstractmethod
-    def run_async(self, dataset: dataset.Dataset, **kwargs) -> str:
+    def run(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
         """
         Train a job and return a job ID
         """
@@ -16,14 +18,14 @@ class TrainingMethod(abc.ABC):
 
 
 class BQMLARIMAPlusTrainingMethod(TrainingMethod):
-    def run_async(self, dataset: dataset.Dataset, **kwargs) -> str:
+    def run(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
         """
         Train a job and return a job ID
         """
 
-        time_column = kwargs.get("time_column")
-        target_column = kwargs.get("target_column")
-        time_series_id_column = kwargs.get("time_series_id_column")
+        time_column = parameters.get("time_column")
+        target_column = parameters.get("target_column")
+        time_series_id_column = parameters.get("time_series_id_column")
 
         if time_column is None:
             raise ValueError(f"Missing argument: time_column")
@@ -77,14 +79,14 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
 
         query_job = client.query(query)
 
-        # df_prediction = query_job.to_dataframe()
+        df_prediction = query_job.to_dataframe()
 
-        # forecast = forecast.Forecast(
-        #     execution_date=datetime.now(),
-        #     dataset=dataset,
-        #     df_prediction=df_prediction,
-        # )
+        forecast = forecast.Forecast(
+            execution_date=datetime.now(),
+            dataset=dataset,
+            df_prediction=df_prediction,
+        )
 
         # forecasts_service.append_forecast(forecast)
 
-        return query_job.job_id
+        return forecast
