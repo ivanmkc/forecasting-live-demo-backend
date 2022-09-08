@@ -1,10 +1,17 @@
-from typing import List
+from typing import Dict, List
 
-from models.forecast import Forecast
+from models.forecast import Forecast, ForecastJob
 
 
 class ForecastsService:
+    _jobs: Dict[str, ForecastJob] = {}
     _forecasts: List[Forecast] = []
 
-    def append_forecast(self, forecast: Forecast):
+    def queue_job(self, job: ForecastJob):
+        self._jobs[job.id] = job
+
+    def get_jobs(self):
+        self._jobs.values()
+
+    def append_forecast_result(self, forecast: Forecast):
         self._forecasts.append(forecast)

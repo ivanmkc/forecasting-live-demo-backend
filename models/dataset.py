@@ -61,8 +61,10 @@ class Dataset(abc.ABC):
             "df_preview": df_preview.to_dict("records"),
         }
 
-    @cached_property
-    def bigquery_uri(self) -> str:
+    def get_bigquery_uri(
+        self,
+        time_column: str,
+    ) -> str:
         dataset_id = utils.generate_uuid()
         table_id = utils.generate_uuid()
 
@@ -73,9 +75,23 @@ class Dataset(abc.ABC):
         bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
         bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
 
+        job_config = bigquery.LoadJobConfig(
+            # Specify a (partial) schema. All columns are always written to the
+            # table. The schema is used to assist in data type definitions.
+            schema=[
+                bigquery.SchemaField(time_column, bigquery.enums.SqlTypeNames.DATE),
+            ],
+            # Optionally, set the write disposition. BigQuery appends loaded rows
+            # to an existing table by default, but with WRITE_TRUNCATE write
+            # disposition it replaces the table with the loaded data.
+            write_disposition="WRITE_TRUNCATE",
+        )
+
         # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
         job = client.load_table_from_dataframe(
-            self.df, f"{project_id}.{dataset_id}.{table_id}"
+            dataframe=self.df,
+            destination=f"{project_id}.{dataset_id}.{table_id}",
+            job_config=job_config,
         )  # Make an API request.
 
         _ = job.result()  # Wait for the job to complete.
@@ -95,6 +111,7 @@ class CSVDataset(Dataset):
     @cached_property
     def df(self) -> pd.DataFrame:
         df = pd.read_csv(self.filepath_or_buffer)
+        df[self.time_column] = pd.to_datetime(df[self.time_column])
         return df
 
 
