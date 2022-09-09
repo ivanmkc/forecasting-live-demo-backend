@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 
 from fastapi import FastAPI, HTTPException
@@ -69,9 +70,9 @@ def pending_jobs():
     return training_jobs_manager_instance.list_pending_jobs()
 
 
-@app.get("/completed_forecasts")
-def completed_forecasts():
-    return training_jobs_manager_instance.list_completed_forecasts()
+@app.get("/completed_jobs")
+def completed_jobs():
+    return training_jobs_manager_instance.list_completed_jobs()
 
 
 @app.post("/train")
@@ -85,6 +86,7 @@ def train(request: TrainRequest):
 
     job_id = training_jobs_manager_instance.enqueue(
         training_jobs_manager.TrainingJobManagerRequest(
+            start_time=datetime.now(),
             training_method=request.type,
             dataset=dataset,
             parameters={

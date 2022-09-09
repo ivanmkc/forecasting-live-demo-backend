@@ -10,7 +10,9 @@ from typing import Any, Dict
 
 class TrainingMethod(abc.ABC):
     @abc.abstractmethod
-    def run(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    def run(
+        self, start_time: datetime, dataset: dataset.Dataset, parameters: Dict[str, Any]
+    ) -> str:
         """
         Train a job and return a job ID
         """
@@ -18,7 +20,9 @@ class TrainingMethod(abc.ABC):
 
 
 class BQMLARIMAPlusTrainingMethod(TrainingMethod):
-    def run(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    def run(
+        self, start_time: datetime, dataset: dataset.Dataset, parameters: Dict[str, Any]
+    ) -> str:
         """
         Train a job and return a job ID
         """
@@ -37,22 +41,27 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
             raise ValueError(f"Missing argument: time_column")
 
         # Start training
-        start_time = datetime.now()
-        query_job = self._train_bigquery(
-            dataset=dataset,
-            time_column=time_column,
-            target_column=target_column,
-            time_series_id_column=time_series_id_column,
-        )
-
-        # Wait for result
-        _ = query_job.result()
-
         output_forecast = forecast.Forecast(
             start_time=start_time,
             end_time=datetime.now(),
-            model_uri=str(query_job.destination),
+            model_uri=None,
+            error_message=None,
         )
+
+        try:
+            query_job = self._train_bigquery(
+                dataset=dataset,
+                time_column=time_column,
+                target_column=target_column,
+                time_series_id_column=time_series_id_column,
+            )
+
+            # Wait for result
+            _ = query_job.result()
+
+            output_forecast.model_uri = str(query_job.destination)
+        except Exception as exception:
+            output_forecast.error_message = str(exception)
 
         return output_forecast
 

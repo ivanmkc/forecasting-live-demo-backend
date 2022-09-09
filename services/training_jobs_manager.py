@@ -1,69 +1,24 @@
 import abc
+from asyncio import Future
 import dataclasses
-import multiprocessing
-import logging
-import os
-import time
-from typing import Dict, List
+from concurrent import futures
+from datetime import datetime
+from tracemalloc import start
+from typing import Any, Dict, List
 
 from models import dataset, forecast
 from services import training_service
 
 import utils
 
-NUM_PROCESSES = multiprocessing.cpu_count() - 1
-
 
 @dataclasses.dataclass
 class TrainingJobManagerRequest:
     training_method: str
     dataset: dataset.Dataset
+    start_time: datetime
     parameters: Dict
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
-
-
-def create_logger():
-    logger = multiprocessing.get_logger()
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler("process.log")
-    fmt = "%(asctime)s - %(levelname)s - %(message)s"
-    formatter = logging.Formatter(fmt)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-    return logger
-
-
-def process_tasks(
-    training_service: training_service.TrainingService,
-    task_queue: multiprocessing.Queue,
-    completed_forecasts: multiprocessing.Queue,
-):
-    """
-    Function for worker to poll for tasks and run them
-
-    args:
-        training_service: The training service to delegate to.
-        task_queue: Mutable, process-safe queue to retrieve jobs from.
-        completed_forecasts: Mutable, process-safe queue to write resultant forecasts to.
-    """
-    logger = create_logger()
-    # proc = os.getpid()
-    while True:
-        if not task_queue.empty():
-            try:
-                request: TrainingJobManagerRequest = task_queue.get()
-
-                if request:
-                    logger.info("Processing request: {request}")
-                    output_forecast = training_service.run(
-                        training_method_name=request.training_method,
-                        dataset=request.dataset,
-                        parameters=request.parameters,
-                    )
-
-                    completed_forecasts.put(output_forecast)
-            except Exception as e:
-                logger.error(e)
 
 
 class TrainingJobManager(abc.ABC):
@@ -72,7 +27,7 @@ class TrainingJobManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def list_pending_jobs(self) -> List[TrainingJobManagerRequest]:
+    def list_pending_jobs(self) -> List[Dict[str, Any]]:
         # TODO: Add pagination
         pass
 
@@ -84,56 +39,54 @@ class MemoryTrainingJobManager(TrainingJobManager):
     Used for development and testing.
     """
 
-    _pending_jobs: multiprocessing.Queue = multiprocessing.Queue()
-    _completed_forecasts: multiprocessing.Queue
-
     def __init__(self, training_service: training_service.TrainingService) -> None:
         super().__init__()
         self._training_service = training_service
-        # self._pending_jobs: queue.Queue[TrainingJobManagerRequest] = queue.Queue()
+        self._thread_pool_executor = futures.ThreadPoolExecutor()
+        self._pending_jobs: Dict[str, TrainingJobManagerRequest] = {}
+        self._completed_jobs: List[Dict[str, forecast.Forecast]] = []
 
-        # TODO: Start worker to process queue
-        self._start_workers()
+    def _process_request(self, request: TrainingJobManagerRequest):
+        output_forecast = self._training_service.run(
+            training_method_name=request.training_method,
+            start_time=request.start_time,
+            dataset=request.dataset,
+            parameters=request.parameters,
+        )
 
-    def _start_workers(self):
-        processes = []
-        print(f"Running with {NUM_PROCESSES} processes!")
-        with multiprocessing.Manager() as manager:
-            self._completed_forecasts = manager.Queue()
+        return request.id, output_forecast
 
-            with multiprocessing.Pool(processes=NUM_PROCESSES) as pool:
-                pool.apply_async(
-                    process_tasks,
-                    (
-                        self._training_service,
-                        self._pending_jobs,
-                        self._completed_forecasts,
-                    ),
-                )
-            # for _ in range(NUM_PROCESSES):
-            #     p = multiprocessing.Process(
-            #         target=process_tasks,
-            #         args=(
-            #             self._training_service,
-            #             self._pending_jobs,
-            #             self._completed_forecasts,
-            #         ),
-            #     )
-            #     processes.append(p)
-            #     p.start()
+    def _append_completed_forecast(self, future: Future):
+        job_id, forecast = future.result()
+
+        if forecast:
+            # Clear pending job
+            del self._pending_jobs[job_id]
+
+            # Append completed forecasts
+            self._completed_jobs.append({job_id: forecast})
 
     def enqueue(self, request: TrainingJobManagerRequest) -> str:
-        # Store job in memory
-        self._pending_jobs.put(request)
+        self._pending_jobs[request.id] = request
+
+        future = self._thread_pool_executor.submit(self._process_request, request)
+        future.add_done_callback(self._append_completed_forecast)
 
         return request.id
 
-    def list_pending_jobs(self) -> List[TrainingJobManagerRequest]:
+    def list_pending_jobs(self) -> List[Dict[str, Any]]:
         # TODO: Add pagination
-        return list(self._pending_jobs.queue)
+        return [
+            {
+                "job_id": request.id,
+                "training_method": request.training_method,
+                "dataset_id": request.dataset.id,
+                "parameters": request.parameters,
+                "start_time": request.start_time,
+            }
+            for job_id, request in self._pending_jobs.items()
+        ]
 
-    def list_completed_forecasts(self) -> List[forecast.Forecast]:
+    def list_completed_jobs(self) -> List[forecast.Forecast]:
         # TODO: Add pagination
-        # return list(self._completed_forecasts.queue)
-        # return [res.get() for res in self._completed_forecasts]
-        return []
+        return self._completed_jobs
