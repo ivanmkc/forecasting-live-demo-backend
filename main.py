@@ -17,7 +17,7 @@ app = FastAPI()
 
 # TODO: Auto-detect registry
 training_registry: Dict[str, training_method.TrainingMethod] = {
-    "bqml": training_method.BQMLARIMAPlusTrainingMethod()
+    training_method.BQMLARIMAPlusTrainingMethod.training_method(): training_method.BQMLARIMAPlusTrainingMethod()
 }
 
 training_service_instance = training_service.TrainingService(
@@ -57,14 +57,6 @@ def preview_dataset(dataset_id: str):
         return target_dataset.df_preview.to_dict("records")
 
 
-class TrainRequest(BaseModel):
-    type: str
-    dataset_id: str
-    time_column: str
-    target_column: str
-    time_series_id_column: str
-
-
 @app.get("/pending_jobs")
 def pending_jobs():
     return training_jobs_manager_instance.list_pending_jobs()
@@ -73,6 +65,19 @@ def pending_jobs():
 @app.get("/completed_jobs")
 def completed_jobs():
     return training_jobs_manager_instance.list_completed_jobs()
+
+
+class TrainRequest(BaseModel):
+    type: str
+
+    # Model training parameters
+    dataset_id: str
+    time_column: str
+    target_column: str
+    time_series_id_column: str
+
+    # Forecast parameters
+    # forecast_horizon: int
 
 
 @app.post("/train")
@@ -98,6 +103,36 @@ def train(request: TrainRequest):
     )
 
     return {"job_id": job_id}
+
+
+class ForecastRequest(BaseModel):
+    model_id: str
+    forecast_horizon: int
+
+
+# @app.post("/forecast")
+# def forecast(request: ForecastRequest):
+# dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
+
+# if dataset is None:
+#     raise HTTPException(
+#         status_code=404, detail=f"Dataset not found: {request.dataset_id}"
+#     )
+
+# job_id = training_jobs_manager_instance.enqueue(
+#     training_jobs_manager.TrainingJobManagerRequest(
+#         start_time=datetime.now(),
+#         training_method=request.type,
+#         dataset=dataset,
+#         parameters={
+#             "time_column": request.time_column,
+#             "target_column": request.target_column,
+#             "time_series_id_column": request.time_series_id_column,
+#         },
+#     )
+# )
+
+# return {"job_id": job_id}
 
 
 # Vertex AI forecasting

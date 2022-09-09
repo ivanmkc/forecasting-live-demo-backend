@@ -2,7 +2,7 @@ import abc
 from datetime import datetime
 from typing import Any, Dict
 from models import dataset
-from models import forecast
+from models import training_result
 from training_methods import training_method
 
 
@@ -21,7 +21,7 @@ class TrainingService:
         start_time: datetime,
         dataset: dataset.Dataset,
         parameters: Dict[str, Any],
-    ) -> forecast.Forecast:
+    ) -> training_result.TrainingResult:
         training_method = self._training_registry.get(training_method_name)
 
         if training_method is None:
@@ -29,6 +29,20 @@ class TrainingService:
                 f"Training method '{training_method_name}' is not supported"
             )
 
-        return training_method.run(
-            start_time=start_time, dataset=dataset, parameters=parameters
+        # Start training
+        output = training_result.TrainingResult(
+            start_time=start_time,
+            end_time=datetime.now(),
+            model_uri=None,
+            error_message=None,
         )
+
+        try:
+            output.model_uri = training_method.train(
+                dataset=dataset, parameters=parameters
+            )
+            output.evaluation = training_method.evaluate(output.model_uri)
+        except Exception as exception:
+            output.error_message = str(exception)
+
+        return output

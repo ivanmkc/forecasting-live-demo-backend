@@ -4,15 +4,27 @@ from datetime import datetime
 from google.cloud import bigquery
 
 import utils
-from models import dataset, forecast
+from models import dataset, training_result
 from typing import Any, Dict
+
+import pandas as pd
 
 
 class TrainingMethod(abc.ABC):
+    @staticmethod
     @abc.abstractmethod
-    def run(
-        self, start_time: datetime, dataset: dataset.Dataset, parameters: Dict[str, Any]
-    ) -> str:
+    def training_method() -> str:
+        pass
+
+    @abc.abstractmethod
+    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+        """
+        Train a job and return the model.
+        """
+        pass
+
+    @abc.abstractmethod
+    def evaluate(self, model: str) -> Dict[str, Any]:
         """
         Train a job and return a job ID
         """
@@ -20,11 +32,13 @@ class TrainingMethod(abc.ABC):
 
 
 class BQMLARIMAPlusTrainingMethod(TrainingMethod):
-    def run(
-        self, start_time: datetime, dataset: dataset.Dataset, parameters: Dict[str, Any]
-    ) -> str:
+    @staticmethod
+    def training_method() -> str:
+        return "bqml"
+
+    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
         """
-        Train a job and return a job ID
+        Train a job and return the results.
         """
 
         time_column = parameters.get("time_column")
@@ -41,32 +55,19 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
             raise ValueError(f"Missing argument: time_column")
 
         # Start training
-        output_forecast = forecast.Forecast(
-            start_time=start_time,
-            end_time=datetime.now(),
-            model_uri=None,
-            error_message=None,
+        query_job = self._train(
+            dataset=dataset,
+            time_column=time_column,
+            target_column=target_column,
+            time_series_id_column=time_series_id_column,
         )
 
-        try:
-            query_job = self._train_bigquery(
-                dataset=dataset,
-                time_column=time_column,
-                target_column=target_column,
-                time_series_id_column=time_series_id_column,
-            )
+        # Wait for result
+        _ = query_job.result()
 
-            # Wait for result
-            _ = query_job.result()
+        return str(query_job.destination)
 
-            output_forecast.model_uri = str(query_job.destination)
-        except Exception as exception:
-            output_forecast.error_message = str(exception)
-
-        return output_forecast
-
-    # This has to be thread-safe
-    def _train_bigquery(
+    def _train(
         self,
         dataset: dataset.Dataset,
         time_column: str,
@@ -101,3 +102,30 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
 
         # Start the query job
         return client.query(query)
+
+    def _evaluate(
+        self,
+        model: str,
+    ) -> bigquery.QueryJob:
+        client = bigquery.Client()
+        query = f"""
+            SELECT
+            *
+            FROM
+            ML.ARIMA_EVALUATE(MODEL {model})
+        """
+
+        # Start the query job
+        return client.query(query)
+
+    def evaluate(self, model: str) -> Dict[str, Any]:
+        """
+        Get evaluation results.
+        """
+
+        query_job = self._evaluate(model=model)
+
+        # Wait for result
+        evaluation: pd.DataFrame = query_job.to_dataframe()
+
+        return evaluation.to_json()
