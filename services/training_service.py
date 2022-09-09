@@ -38,10 +38,18 @@ class TrainingService:
         )
 
         try:
+            # Train model
             output.model_uri = training_method.train(
                 dataset=dataset, parameters=parameters
             )
-            output.evaluation = training_method.evaluate(output.model_uri)
+
+            # Run evaluation
+            output.evaluation_uri = training_method.evaluate(model=output.model_uri)
+
+            # Run forecast
+            output.forecast_uri = training_method.forecast(
+                model=output.model_uri, parameters={}
+            )
         except Exception as exception:
             output.error_message = str(exception)
 

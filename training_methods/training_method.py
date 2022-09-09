@@ -19,14 +19,21 @@ class TrainingMethod(abc.ABC):
     @abc.abstractmethod
     def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
         """
-        Train a job and return the model.
+        Train a job and return the model URI.
         """
         pass
 
     @abc.abstractmethod
-    def evaluate(self, model: str) -> Dict[str, Any]:
+    def evaluate(self, model: str) -> str:
         """
-        Train a job and return a job ID
+        Evaluate the model and return the table URI.
+        """
+        pass
+
+    @abc.abstractmethod
+    def forecast(self, model: str, parameters: Dict[str, Any]) -> str:
+        """
+        Run the forecast and return the table URI.
         """
         pass
 
@@ -61,6 +68,29 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
             target_column=target_column,
             time_series_id_column=time_series_id_column,
         )
+
+        # Wait for result
+        _ = query_job.result()
+
+        return str(query_job.destination)
+
+    def evaluate(self, model: str) -> str:
+        """
+        Run evaluation and return the BigQuery table.
+        """
+
+        query_job = self._evaluate(model=model)
+
+        # Wait for result
+        _ = query_job.result()
+
+        return str(query_job.destination)
+
+    def forecast(self, model: str, parameters: Dict[str, Any]) -> str:
+        """
+        Run the forecast and return the table URI.
+        """
+        query_job = self._forecast(model=model, parameters=parameters)
 
         # Wait for result
         _ = query_job.result()
@@ -108,24 +138,27 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
         model: str,
     ) -> bigquery.QueryJob:
         client = bigquery.Client()
+
         query = f"""
             SELECT
             *
             FROM
-            ML.ARIMA_EVALUATE(MODEL {model})
+            ML.ARIMA_EVALUATE(MODEL `{model}`)
         """
 
         # Start the query job
         return client.query(query)
 
-    def evaluate(self, model: str) -> Dict[str, Any]:
+    def _forecast(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
+        client = bigquery.Client()
+
+        query = f"""
+            SELECT
+            *
+            FROM
+            ML.FORECAST(MODEL `{model}`,
+                        STRUCT(30 AS horizon, 0.8 AS confidence_level))            
         """
-        Get evaluation results.
-        """
 
-        query_job = self._evaluate(model=model)
-
-        # Wait for result
-        evaluation: pd.DataFrame = query_job.to_dataframe()
-
-        return evaluation.to_json()
+        # Start the query job
+        return client.query(query)
