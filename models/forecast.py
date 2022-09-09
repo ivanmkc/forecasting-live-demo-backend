@@ -1,33 +1,14 @@
-import abc
-import dataclasses
 from datetime import datetime
-
-import pandas as pd
-
-from models import dataset
-import utils
-
-
-@dataclasses.dataclass
-class ForecastJob(abc.ABC):
-    start_time: datetime
-    status: str
-    id: str = dataclasses.field(default_factory=utils.generate_uuid)
-
-
-# class BQMLForecastJob(ForecastJob):
-#     @property
-#     def status(self) -> str:
 
 
 class Forecast:
     def __init__(
         self,
-        execution_date: datetime,  # Date when forecast was executed
-        dataset: dataset.Dataset,  # Start date of forecast data
-        df_prediction: pd.DataFrame,
+        start_time: datetime,  # Date when forecast was started
+        end_time: datetime,  # Date when forecast was finished
+        model_uri: str,  # Output model URI
     ) -> None:
         super().__init__()
-        self.execution_date = execution_date
-        self.dataset = dataset
-        self.df_prediction = df_prediction
+        self.start_time = start_time
+        self.end_time = end_time
+        self.model_uri = model_uri

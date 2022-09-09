@@ -1,6 +1,5 @@
 import abc
-from typing import Any, Dict, List
-from services.forecasts_service import ForecastsService
+from typing import Any, Dict
 from models import dataset
 from training_methods import training_method
 

@@ -1,6 +1,6 @@
 import abc
 
-import datetime
+from datetime import datetime
 from google.cloud import bigquery
 
 import utils
@@ -36,12 +36,25 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
         if time_series_id_column is None:
             raise ValueError(f"Missing argument: time_column")
 
-        return self._train_bigquery(
+        # Start training
+        start_time = datetime.now()
+        query_job = self._train_bigquery(
             dataset=dataset,
             time_column=time_column,
             target_column=target_column,
             time_series_id_column=time_series_id_column,
         )
+
+        # Wait for result
+        _ = query_job.result()
+
+        output_forecast = forecast.Forecast(
+            start_time=start_time,
+            end_time=datetime.now(),
+            model_uri=str(query_job.destination),
+        )
+
+        return output_forecast
 
     # This has to be thread-safe
     def _train_bigquery(
@@ -50,7 +63,7 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
         time_column: str,
         target_column: str,
         time_series_id_column: str,
-    ) -> str:
+    ) -> bigquery.QueryJob:
         client = bigquery.Client()
         project_id = client.project
         dataset_id = utils.generate_uuid()
@@ -77,16 +90,5 @@ class BQMLARIMAPlusTrainingMethod(TrainingMethod):
             `{bigquery_uri}`
         """
 
-        query_job = client.query(query)
-
-        df_prediction = query_job.to_dataframe()
-
-        forecast = forecast.Forecast(
-            execution_date=datetime.now(),
-            dataset=dataset,
-            df_prediction=df_prediction,
-        )
-
-        # forecasts_service.append_forecast(forecast)
-
-        return forecast
+        # Start the query job
+        return client.query(query)

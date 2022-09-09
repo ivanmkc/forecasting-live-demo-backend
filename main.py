@@ -64,6 +64,16 @@ class TrainRequest(BaseModel):
     time_series_id_column: str
 
 
+@app.get("/pending_jobs")
+def pending_jobs():
+    return training_jobs_manager_instance.list_pending_jobs()
+
+
+@app.get("/completed_forecasts")
+def completed_forecasts():
+    return training_jobs_manager_instance.list_completed_forecasts()
+
+
 @app.post("/train")
 def train(request: TrainRequest):
     dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)

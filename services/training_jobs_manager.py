@@ -6,13 +6,10 @@ import os
 import time
 from typing import Dict, List
 
-from models import dataset
-from services.forecasts_service import ForecastsService
+from models import dataset, forecast
 from services import training_service
 
 import utils
-
-forecasts_service = ForecastsService()
 
 NUM_PROCESSES = multiprocessing.cpu_count() - 1
 
@@ -38,24 +35,33 @@ def create_logger():
 
 def process_tasks(
     training_service: training_service.TrainingService,
-    task_queue,
+    task_queue: multiprocessing.Queue,
+    completed_forecasts: multiprocessing.Queue,
 ):
     """
     Function for worker to poll for tasks and run them
+
+    args:
+        training_service: The training service to delegate to.
+        task_queue: Mutable, process-safe queue to retrieve jobs from.
+        completed_forecasts: Mutable, process-safe queue to write resultant forecasts to.
     """
     logger = create_logger()
-    proc = os.getpid()
+    # proc = os.getpid()
     while True:
         if not task_queue.empty():
             try:
                 request: TrainingJobManagerRequest = task_queue.get()
 
                 if request:
-                    # get_word_counts(book)
                     logger.info("Processing request: {request}")
-                    training_service.run_async(
-                        dataset=request.dataset, **request.parameters
+                    output_forecast = training_service.run(
+                        training_method_name=request.training_method,
+                        dataset=request.dataset,
+                        parameters=request.parameters,
                     )
+
+                    completed_forecasts.put(output_forecast)
             except Exception as e:
                 logger.error(e)
 
@@ -78,13 +84,13 @@ class MemoryTrainingJobManager(TrainingJobManager):
     Used for development and testing.
     """
 
+    _pending_jobs: multiprocessing.Queue = multiprocessing.Queue()
+    _completed_forecasts: multiprocessing.Queue
+
     def __init__(self, training_service: training_service.TrainingService) -> None:
         super().__init__()
         self._training_service = training_service
         # self._pending_jobs: queue.Queue[TrainingJobManagerRequest] = queue.Queue()
-        self._pending_jobs: multiprocessing.Queue[
-            TrainingJobManagerRequest
-        ] = multiprocessing.Queue()
 
         # TODO: Start worker to process queue
         self._start_workers()
@@ -92,16 +98,29 @@ class MemoryTrainingJobManager(TrainingJobManager):
     def _start_workers(self):
         processes = []
         print(f"Running with {NUM_PROCESSES} processes!")
-        for _ in range(NUM_PROCESSES):
-            p = multiprocessing.Process(
-                target=process_tasks,
-                args=(
-                    self._training_service,
-                    self._pending_jobs,
-                ),
-            )
-            processes.append(p)
-            p.start()
+        with multiprocessing.Manager() as manager:
+            self._completed_forecasts = manager.Queue()
+
+            with multiprocessing.Pool(processes=NUM_PROCESSES) as pool:
+                pool.apply_async(
+                    process_tasks,
+                    (
+                        self._training_service,
+                        self._pending_jobs,
+                        self._completed_forecasts,
+                    ),
+                )
+            # for _ in range(NUM_PROCESSES):
+            #     p = multiprocessing.Process(
+            #         target=process_tasks,
+            #         args=(
+            #             self._training_service,
+            #             self._pending_jobs,
+            #             self._completed_forecasts,
+            #         ),
+            #     )
+            #     processes.append(p)
+            #     p.start()
 
     def enqueue(self, request: TrainingJobManagerRequest) -> str:
         # Store job in memory
@@ -112,3 +131,9 @@ class MemoryTrainingJobManager(TrainingJobManager):
     def list_pending_jobs(self) -> List[TrainingJobManagerRequest]:
         # TODO: Add pagination
         return list(self._pending_jobs.queue)
+
+    def list_completed_forecasts(self) -> List[forecast.Forecast]:
+        # TODO: Add pagination
+        # return list(self._completed_forecasts.queue)
+        # return [res.get() for res in self._completed_forecasts]
+        return []
