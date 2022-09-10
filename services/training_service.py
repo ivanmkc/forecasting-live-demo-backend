@@ -1,8 +1,8 @@
 import abc
 from datetime import datetime
 from typing import Any, Dict
-from models import dataset
-from models import training_result
+
+from models import dataset, training_result
 from training_methods import training_method
 
 

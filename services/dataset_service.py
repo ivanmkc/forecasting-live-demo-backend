@@ -1,9 +1,7 @@
+import logging
 from typing import List, Optional
 
 from models import dataset
-
-import logging
-from typing import List, Optional
 
 DATASETS = [
     dataset.CSVDataset(

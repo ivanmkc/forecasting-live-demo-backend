@@ -1,17 +1,17 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 
-from services import dataset_service, training_service
-from training_methods import training_method
 from services import dataset_service, training_jobs_manager, training_service
+from training_methods import training_method
 
 logger = logging.getLogger(__name__)
+from typing import Dict
+
 from pydantic import BaseModel
 
 from services import dataset_service
-from typing import Dict
 
 app = FastAPI()
 
@@ -54,7 +54,7 @@ def preview_dataset(dataset_id: str):
             status_code=404, detail=f"Dataset id {dataset_id} was not found!"
         )
     else:
-        return target_dataset.df_preview.to_dict("records")
+        return target_dataset.df_preview.to_dict(orient="records")
 
 
 @app.get("/pending_jobs")
@@ -89,7 +89,7 @@ def train(request: TrainRequest):
             status_code=404, detail=f"Dataset not found: {request.dataset_id}"
         )
 
-    job_id = training_jobs_manager_instance.enqueue(
+    job_id = training_jobs_manager_instance.enqueue_job(
         training_jobs_manager.TrainingJobManagerRequest(
             start_time=datetime.now(),
             training_method=request.type,
@@ -103,6 +103,28 @@ def train(request: TrainRequest):
     )
 
     return {"job_id": job_id}
+
+
+# Get evaluation
+@app.get("/evaluation")
+async def evaluation(job_id: str):
+    evaluation = training_jobs_manager_instance.get_evaluation(job_id=job_id)
+
+    if evaluation is None:
+        raise HTTPException(status_code=404, detail=f"Evaluation not found: {job_id}")
+    else:
+        return evaluation.to_json(orient="records")
+
+
+# Get forecast
+@app.get("/forecast")
+async def forecast(job_id: str):
+    forecast = training_jobs_manager_instance.get_forecast(job_id=job_id)
+
+    if forecast is None:
+        raise HTTPException(status_code=404, detail=f"Forecast not found: {job_id}")
+    else:
+        return forecast.to_json(orient="records")
 
 
 class ForecastRequest(BaseModel):

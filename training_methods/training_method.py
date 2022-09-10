@@ -1,13 +1,12 @@
 import abc
-
 from datetime import datetime
+from typing import Any, Dict
+
+import pandas as pd
 from google.cloud import bigquery
 
 import utils
 from models import dataset, training_result
-from typing import Any, Dict
-
-import pandas as pd
 
 
 class TrainingMethod(abc.ABC):
