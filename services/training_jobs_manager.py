@@ -21,11 +21,17 @@ class TrainingJobManagerRequest:
     training_method: str
     dataset: dataset.Dataset
     start_time: datetime
-    parameters: Dict
+    model_parameters: Dict[str, Any]
+    forecast_parameters: Dict[str, Any]
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
 
 
 class TrainingJobManager(abc.ABC):
+    """
+    Manages the queue of jobs, listing pending jobs and getting results.
+    A job is defined as a pipeline involved training a model, getting evaluations and getting a forecast.
+    """
+
     @abc.abstractmethod
     def enqueue_job(self, request: TrainingJobManagerRequest) -> str:
         pass
@@ -66,10 +72,11 @@ class MemoryTrainingJobManager(TrainingJobManager):
             training_method_name=request.training_method,
             start_time=request.start_time,
             dataset=request.dataset,
-            parameters=request.parameters,
+            model_parameters=request.model_parameters,
+            forecast_parameters=request.forecast_parameters,
         )
 
-        return training_result
+        return request.id, training_result
 
     def _append_completed_training_result(self, future: futures.Future):
         output: Tuple[str, training_result.TrainingResult] = future.result()
@@ -99,7 +106,8 @@ class MemoryTrainingJobManager(TrainingJobManager):
                 "job_id": request.id,
                 "training_method": request.training_method,
                 "dataset_id": request.dataset.id,
-                "parameters": request.parameters,
+                "model_parameters": request.model_parameters,
+                "forecast_parameters": request.forecast_parameters,
                 "start_time": request.start_time,
             }
             for request in self._pending_jobs.values()
@@ -109,27 +117,24 @@ class MemoryTrainingJobManager(TrainingJobManager):
         # TODO: Add pagination
         return [
             {
+                "job_id": job_id,
                 "start_time": result.start_time,
                 "end_time": result.end_time,
                 "error_message": result.error_message,
             }
-            for result in self._completed_jobs.values()
+            for job_id, result in self._completed_jobs.items()
         ]
 
     def _get_bigquery_table_as_df(self, table_id: str) -> pd.DataFrame:
-        bigquery_uri = self._evaluation_uri_map.get(table_id)
-
         client = bigquery.Client()
         query = f"""
             SELECT *
-            FROM `{bigquery_uri}`
+            FROM `{table_id}`
         """
 
         query_job = client.query(
-            query,
-            # Location must match that of the dataset(s) referenced in the query.
-            location="US",
-        )  # API request - starts the query
+            query=query,
+        )
 
         df = query_job.to_dataframe()
         return df

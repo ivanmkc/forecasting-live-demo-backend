@@ -7,7 +7,7 @@ from services import dataset_service, training_jobs_manager, training_service
 from training_methods import training_method
 
 logger = logging.getLogger(__name__)
-from typing import Dict
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -68,20 +68,16 @@ def completed_jobs():
 
 
 class TrainRequest(BaseModel):
-    type: str
-
-    # Model training parameters
+    training_method: str
     dataset_id: str
-    time_column: str
-    target_column: str
-    time_series_id_column: str
-
-    # Forecast parameters
-    # forecast_horizon: int
+    model_parameters: Optional[Dict[str, Any]] = None
+    forecast_parameters: Optional[Dict[str, Any]] = None
 
 
 @app.post("/train")
-def train(request: TrainRequest):
+def train(
+    request: TrainRequest,
+):
     dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
 
     if dataset is None:
@@ -92,13 +88,10 @@ def train(request: TrainRequest):
     job_id = training_jobs_manager_instance.enqueue_job(
         training_jobs_manager.TrainingJobManagerRequest(
             start_time=datetime.now(),
-            training_method=request.type,
+            training_method=request.training_method,
             dataset=dataset,
-            parameters={
-                "time_column": request.time_column,
-                "target_column": request.target_column,
-                "time_series_id_column": request.time_series_id_column,
-            },
+            model_parameters=request.model_parameters,
+            forecast_parameters=request.forecast_parameters,
         )
     )
 
@@ -106,7 +99,7 @@ def train(request: TrainRequest):
 
 
 # Get evaluation
-@app.get("/evaluation")
+@app.get("/evaluation/{job_id}")
 async def evaluation(job_id: str):
     evaluation = training_jobs_manager_instance.get_evaluation(job_id=job_id)
 
@@ -117,7 +110,7 @@ async def evaluation(job_id: str):
 
 
 # Get forecast
-@app.get("/forecast")
+@app.get("/forecast/{job_id}")
 async def forecast(job_id: str):
     forecast = training_jobs_manager_instance.get_forecast(job_id=job_id)
 

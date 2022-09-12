@@ -20,7 +20,8 @@ class TrainingService:
         training_method_name: str,
         start_time: datetime,
         dataset: dataset.Dataset,
-        parameters: Dict[str, Any],
+        model_parameters: Dict[str, Any],
+        forecast_parameters: Dict[str, Any],
     ) -> training_result.TrainingResult:
         training_method = self._training_registry.get(training_method_name)
 
@@ -40,7 +41,7 @@ class TrainingService:
         try:
             # Train model
             output.model_uri = training_method.train(
-                dataset=dataset, parameters=parameters
+                dataset=dataset, parameters=model_parameters
             )
 
             # Run evaluation
@@ -48,7 +49,7 @@ class TrainingService:
 
             # Run forecast
             output.forecast_uri = training_method.forecast(
-                model=output.model_uri, parameters={}
+                model=output.model_uri, parameters=forecast_parameters
             )
         except Exception as exception:
             output.error_message = str(exception)
