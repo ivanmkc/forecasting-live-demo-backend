@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 
 from services import dataset_service, training_jobs_manager, training_service
-from training_methods import training_method
+from training_methods import training_method, bqml_training_method
 
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, Optional
@@ -17,7 +17,7 @@ app = FastAPI()
 
 # TODO: Auto-detect registry
 training_registry: Dict[str, training_method.TrainingMethod] = {
-    training_method.BQMLARIMAPlusTrainingMethod.training_method(): training_method.BQMLARIMAPlusTrainingMethod()
+    bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod()
 }
 
 training_service_instance = training_service.TrainingService(
@@ -67,7 +67,7 @@ def completed_jobs():
     return training_jobs_manager_instance.list_completed_jobs()
 
 
-class TrainRequest(BaseModel):
+class TrainAPIRequest(BaseModel):
     training_method: str
     dataset_id: str
     model_parameters: Optional[Dict[str, Any]] = None
@@ -76,7 +76,7 @@ class TrainRequest(BaseModel):
 
 @app.post("/train")
 def train(
-    request: TrainRequest,
+    request: TrainAPIRequest,
 ):
     dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
 
@@ -90,8 +90,8 @@ def train(
             start_time=datetime.now(),
             training_method=request.training_method,
             dataset=dataset,
-            model_parameters=request.model_parameters,
-            forecast_parameters=request.forecast_parameters,
+            model_parameters=request.model_parameters or {},
+            forecast_parameters=request.forecast_parameters or {},
         )
     )
 
