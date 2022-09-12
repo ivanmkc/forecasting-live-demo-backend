@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 
-from services import dataset_service, training_jobs_manager, training_service
+from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import bqml_training_method, training_method
 
 logger = logging.getLogger(__name__)
@@ -20,10 +20,10 @@ training_registry: Dict[str, training_method.TrainingMethod] = {
     bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod()
 }
 
-training_service_instance = training_service.TrainingJobService(
+training_service_instance = forecast_job_service.ForecastJobService(
     training_registry=training_registry
 )
-training_jobs_manager_instance = training_jobs_manager.MemoryTrainingJobManager(
+training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobManager(
     training_service=training_service_instance
 )
 
@@ -95,7 +95,7 @@ def train(
         )
 
     job_id = training_jobs_manager_instance.enqueue_job(
-        training_jobs_manager.ForecastJobRequest(
+        forecast_job_coordinator.ForecastJobRequest(
             start_time=datetime.now(),
             training_method=request.training_method,
             dataset=dataset,

@@ -6,7 +6,7 @@ from models import dataset, training_result
 from training_methods import training_method
 
 
-class TrainingJobService:
+class ForecastJobService:
     """
     This service handles model training, evaluation and prediction.
     """

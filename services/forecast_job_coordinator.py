@@ -9,7 +9,7 @@ from google.cloud import bigquery
 
 import utils
 from models import dataset, training_result
-from services import training_service
+from services import forecast_job_service
 
 
 @dataclasses.dataclass
@@ -35,9 +35,9 @@ class ForecastJobRequest:
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
 
 
-class ForecastJobManager(abc.ABC):
+class ForecastJobCoordinator(abc.ABC):
     """
-    Manages the queue of jobs, listing pending jobs and getting results.
+    Coordinates the queue of jobs, listing pending jobs and getting results.
     A forecast job is defined as a pipeline involved training a model, getting evaluations and getting a prediction.
     """
 
@@ -96,7 +96,7 @@ class ForecastJobManager(abc.ABC):
         pass
 
 
-class MemoryTrainingJobManager(ForecastJobManager):
+class MemoryTrainingJobManager(ForecastJobCoordinator):
     """
     A job manager to queue jobs and delegate jobs to workers.
 
@@ -104,7 +104,9 @@ class MemoryTrainingJobManager(ForecastJobManager):
     However, may be used in production if session affinity (https://cloud.google.com/run/docs/configuring/session-affinity) is enabled.
     """
 
-    def __init__(self, training_service: training_service.TrainingJobService) -> None:
+    def __init__(
+        self, training_service: forecast_job_service.ForecastJobService
+    ) -> None:
         """Initializes the manager.
 
         Args:
