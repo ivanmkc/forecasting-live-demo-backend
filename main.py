@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 
 from services import dataset_service, training_jobs_manager, training_service
-from training_methods import training_method, bqml_training_method
+from training_methods import bqml_training_method, training_method
 
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, Optional
@@ -20,7 +20,7 @@ training_registry: Dict[str, training_method.TrainingMethod] = {
     bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod()
 }
 
-training_service_instance = training_service.TrainingService(
+training_service_instance = training_service.TrainingJobService(
     training_registry=training_registry
 )
 training_jobs_manager_instance = training_jobs_manager.MemoryTrainingJobManager(
@@ -67,16 +67,25 @@ def completed_jobs():
     return training_jobs_manager_instance.list_completed_jobs()
 
 
-class TrainAPIRequest(BaseModel):
+class ForecastJobAPIRequest(BaseModel):
+    """A forecast job request includes information to train a model, evaluate it and create a forecast prediction.
+
+    Args:
+        training_method (str): The unique key associated with a training method.
+        dataset_id (str): The dataset id to be used for training.
+        model_parameters (Dict[str, Any]): Parameters for training.
+        prediction_parameters (Dict[str, Any]): Parameters for training.
+    """
+
     training_method: str
     dataset_id: str
     model_parameters: Optional[Dict[str, Any]] = None
-    forecast_parameters: Optional[Dict[str, Any]] = None
+    prediction_parameters: Optional[Dict[str, Any]] = None
 
 
 @app.post("/train")
 def train(
-    request: TrainAPIRequest,
+    request: ForecastJobAPIRequest,
 ):
     dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
 
@@ -86,12 +95,12 @@ def train(
         )
 
     job_id = training_jobs_manager_instance.enqueue_job(
-        training_jobs_manager.TrainingJobManagerRequest(
+        training_jobs_manager.ForecastJobRequest(
             start_time=datetime.now(),
             training_method=request.training_method,
             dataset=dataset,
             model_parameters=request.model_parameters or {},
-            forecast_parameters=request.forecast_parameters or {},
+            prediction_parameters=request.prediction_parameters or {},
         )
     )
 
@@ -109,47 +118,12 @@ async def evaluation(job_id: str):
         return evaluation.to_json(orient="records")
 
 
-# Get forecast
-@app.get("/forecast/{job_id}")
-async def forecast(job_id: str):
-    forecast = training_jobs_manager_instance.get_forecast(job_id=job_id)
+# Get prediction
+@app.get("/prediction/{job_id}")
+async def prediction(job_id: str):
+    prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
 
-    if forecast is None:
-        raise HTTPException(status_code=404, detail=f"Forecast not found: {job_id}")
+    if prediction is None:
+        raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
     else:
-        return forecast.to_json(orient="records")
-
-
-class ForecastRequest(BaseModel):
-    model_id: str
-    forecast_horizon: int
-
-
-# @app.post("/forecast")
-# def forecast(request: ForecastRequest):
-# dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
-
-# if dataset is None:
-#     raise HTTPException(
-#         status_code=404, detail=f"Dataset not found: {request.dataset_id}"
-#     )
-
-# job_id = training_jobs_manager_instance.enqueue(
-#     training_jobs_manager.TrainingJobManagerRequest(
-#         start_time=datetime.now(),
-#         training_method=request.type,
-#         dataset=dataset,
-#         parameters={
-#             "time_column": request.time_column,
-#             "target_column": request.target_column,
-#             "time_series_id_column": request.time_series_id_column,
-#         },
-#     )
-# )
-
-# return {"job_id": job_id}
-
-
-# Vertex AI forecasting
-
-# TODO: Get historical forecasts (and pending jobs)
+        return prediction.to_json(orient="records")

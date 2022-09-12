@@ -11,46 +11,92 @@ import utils
 from models import dataset, training_result
 from services import training_service
 
-# Temporary type-alias
-# Evaluation = pd.DataFrame  # Dict[str, Any]
-# Forecast = pd.DataFrame  # Dict[str, Any]
-
 
 @dataclasses.dataclass
-class TrainingJobManagerRequest:
+class ForecastJobRequest:
+    """An encapsulation of the training job request"""
+
+    # The unique key associated with a training method.
     training_method: str
+
+    # The dataset used for model training.
     dataset: dataset.Dataset
+
+    # The request start time.
     start_time: datetime
+
+    # Parameters for training.
     model_parameters: Dict[str, Any]
-    forecast_parameters: Dict[str, Any]
+
+    # Parameters for prediction.
+    prediction_parameters: Dict[str, Any]
+
+    # The unique request id.
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
 
 
-class TrainingJobManager(abc.ABC):
+class ForecastJobManager(abc.ABC):
     """
     Manages the queue of jobs, listing pending jobs and getting results.
-    A job is defined as a pipeline involved training a model, getting evaluations and getting a forecast.
+    A forecast job is defined as a pipeline involved training a model, getting evaluations and getting a prediction.
     """
 
     @abc.abstractmethod
-    def enqueue_job(self, request: TrainingJobManagerRequest) -> str:
+    def enqueue_job(self, request: ForecastJobRequest) -> str:
+        """Enqueue the request to a job queue for later processing.
+
+        Args:
+            request (TrainingJobManagerRequest): The job request.
+
+        Returns:
+            str: The job id
+        """
         pass
 
     @abc.abstractmethod
     def list_pending_jobs(self) -> List[Dict[str, Any]]:
+        """List pending jobs.
+
+        Returns:
+            List[Dict[str, Any]]: The pending jobs.
+        """
         # TODO: Add pagination
+        pass
+
+    def list_completed_jobs(self) -> List[training_result.ForecastJobResult]:
+        """List completed jobs.
+
+        Returns:
+            List[training_result.TrainingResult]: The completed results.
+        """
         pass
 
     @abc.abstractmethod
     def get_evaluation(self, job_id: str) -> Optional[pd.DataFrame]:
+        """Get the evaluation dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[pd.DataFrame]: The evaluation dataframe.
+        """
         pass
 
     @abc.abstractmethod
-    def get_forecast(self, job_id: str) -> Optional[pd.DataFrame]:
+    def get_prediction(self, job_id: str) -> Optional[pd.DataFrame]:
+        """Get the prediction dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[pd.DataFrame]: The prediction dataframe.
+        """
         pass
 
 
-class MemoryTrainingJobManager(TrainingJobManager):
+class MemoryTrainingJobManager(ForecastJobManager):
     """
     A job manager to queue jobs and delegate jobs to workers.
 
@@ -58,27 +104,47 @@ class MemoryTrainingJobManager(TrainingJobManager):
     However, may be used in production if session affinity (https://cloud.google.com/run/docs/configuring/session-affinity) is enabled.
     """
 
-    def __init__(self, training_service: training_service.TrainingService) -> None:
+    def __init__(self, training_service: training_service.TrainingJobService) -> None:
+        """Initializes the manager.
+
+        Args:
+            training_service (training_service.TrainingJobService): The service used by each worker to run the training job.
+        """
         super().__init__()
         self._training_service = training_service
         self._thread_pool_executor = futures.ThreadPoolExecutor()
-        self._pending_jobs: Dict[str, TrainingJobManagerRequest] = {}
-        self._completed_jobs: Dict[str, training_result.TrainingResult] = {}
+        self._pending_jobs: Dict[str, ForecastJobRequest] = {}
+        self._completed_jobs: Dict[str, training_result.ForecastJobResult] = {}
         self._evaluation_uri_map: Dict[str, str] = {}
-        self._forecast_uri_map: Dict[str, str] = {}
+        self._prediction_uri_map: Dict[str, str] = {}
 
-    def _process_request(self, request: TrainingJobManagerRequest):
+    def _process_request(
+        self, request: ForecastJobRequest
+    ) -> Tuple[str, training_result.ForecastJobResult]:
+        """Process the training jobs request.
+
+        Args:
+            request (TrainingJobManagerRequest): The request
+
+        Returns:
+            Tuple[str, training_result.TrainingResult]: The job id and result.
+        """
         training_result = self._training_service.run(
             training_method_name=request.training_method,
             start_time=request.start_time,
             dataset=request.dataset,
             model_parameters=request.model_parameters,
-            forecast_parameters=request.forecast_parameters,
+            prediction_parameters=request.prediction_parameters,
         )
 
         return request.id, training_result
 
     def _append_completed_training_result(self, future: futures.Future):
+        """Append the result to a cache. Used as a Future callback.
+
+        Args:
+            future (futures.Future): The future that will return the TrainingResult.
+        """
         output: Tuple[str, training_result.TrainingResult] = future.result()
 
         # Deconstruct
@@ -91,7 +157,15 @@ class MemoryTrainingJobManager(TrainingJobManager):
             # Append completed training results
             self._completed_jobs[job_id] = training_result
 
-    def enqueue_job(self, request: TrainingJobManagerRequest) -> str:
+    def enqueue_job(self, request: ForecastJobRequest) -> str:
+        """Enqueue the request to a job queue for later processing.
+
+        Args:
+            request (TrainingJobManagerRequest): The job request.
+
+        Returns:
+            str: The job id
+        """
         self._pending_jobs[request.id] = request
 
         future = self._thread_pool_executor.submit(self._process_request, request)
@@ -100,6 +174,11 @@ class MemoryTrainingJobManager(TrainingJobManager):
         return request.id
 
     def list_pending_jobs(self) -> List[Dict[str, Any]]:
+        """List pending jobs.
+
+        Returns:
+            List[Dict[str, Any]]: The pending jobs.
+        """
         # TODO: Add pagination
         return [
             {
@@ -107,13 +186,18 @@ class MemoryTrainingJobManager(TrainingJobManager):
                 "training_method": request.training_method,
                 "dataset_id": request.dataset.id,
                 "model_parameters": request.model_parameters,
-                "forecast_parameters": request.forecast_parameters,
+                "prediction_parameters": request.prediction_parameters,
                 "start_time": request.start_time,
             }
             for request in self._pending_jobs.values()
         ]
 
-    def list_completed_jobs(self) -> List[training_result.TrainingResult]:
+    def list_completed_jobs(self) -> List[training_result.ForecastJobResult]:
+        """List completed jobs.
+
+        Returns:
+            List[training_result.TrainingResult]: The completed results.
+        """
         # TODO: Add pagination
         return [
             {
@@ -140,6 +224,14 @@ class MemoryTrainingJobManager(TrainingJobManager):
         return df
 
     def get_evaluation(self, job_id: str) -> Optional[pd.DataFrame]:
+        """Get the evaluation dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[pd.DataFrame]: The evaluation dataframe.
+        """
         job = self._completed_jobs.get(job_id)
 
         if job is None:
@@ -148,11 +240,19 @@ class MemoryTrainingJobManager(TrainingJobManager):
         table_id = job.evaluation_uri
         return self._get_bigquery_table_as_df(table_id=table_id) if table_id else None
 
-    def get_forecast(self, job_id: str) -> Optional[pd.DataFrame]:
+    def get_prediction(self, job_id: str) -> Optional[pd.DataFrame]:
+        """Get the prediction dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[pd.DataFrame]: The prediction dataframe.
+        """
         job = self._completed_jobs.get(job_id)
 
         if job is None:
             return None
 
-        table_id = job.forecast_uri
+        table_id = job.prediction_uri
         return self._get_bigquery_table_as_df(table_id=table_id) if table_id else None

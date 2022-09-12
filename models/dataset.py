@@ -22,6 +22,11 @@ class Dataset(abc.ABC):
     @property
     @abc.abstractmethod
     def df(self) -> pd.DataFrame:
+        """The full dataset dataframe, which can be quite large.
+
+        Returns:
+            pd.DataFrame: The dataset represented as a Pandas dataframe.
+        """
         pass
 
     @cached_property

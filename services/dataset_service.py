@@ -26,7 +26,14 @@ def get_datasets() -> List[dataset.Dataset]:
 
 
 def get_dataset(dataset_id: str) -> Optional[dataset.Dataset]:
-    """This functions returns a dataset based on the dataset id as input."""
+    """Get the dataset given the dataset_id.
+
+    Args:
+        dataset_id (str): Dataset id.
+
+    Returns:
+        Optional[dataset.Dataset]: The dataset.
+    """
 
     target_dataset = None
 

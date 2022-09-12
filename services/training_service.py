@@ -6,10 +6,19 @@ from models import dataset, training_result
 from training_methods import training_method
 
 
-class TrainingService:
+class TrainingJobService:
+    """
+    This service handles model training, evaluation and prediction.
+    """
+
     def __init__(
         self, training_registry: Dict[str, training_method.TrainingMethod]
     ) -> None:
+        """_summary_
+
+        Args:
+            training_registry (Dict[str, training_method.TrainingMethod]): _description_
+        """
         super().__init__()
 
         # TODO: Register training methods
@@ -21,8 +30,23 @@ class TrainingService:
         start_time: datetime,
         dataset: dataset.Dataset,
         model_parameters: Dict[str, Any],
-        forecast_parameters: Dict[str, Any],
-    ) -> training_result.TrainingResult:
+        prediction_parameters: Dict[str, Any],
+    ) -> training_result.ForecastJobResult:
+        """Run model training, evaluation and prediction for a given `training_method_name`. Waits for completion.
+
+        Args:
+            training_method_name (str): The training method name as defined in the training registry.
+            start_time (datetime): Start time of job.
+            dataset (dataset.Dataset): The dataset used for training.
+            model_parameters (Dict[str, Any]): The parameters for training.
+            prediction_parameters (Dict[str, Any]): The paramters for prediction.
+
+        Raises:
+            ValueError: Any error that happens during training, evaluation or prediction.
+
+        Returns:
+            training_result.TrainingResult: The results containing the URIs for each step.
+        """
         training_method = self._training_registry.get(training_method_name)
 
         if training_method is None:
@@ -31,7 +55,7 @@ class TrainingService:
             )
 
         # Start training
-        output = training_result.TrainingResult(
+        output = training_result.ForecastJobResult(
             start_time=start_time,
             end_time=datetime.now(),
             model_uri=None,
@@ -47,9 +71,9 @@ class TrainingService:
             # Run evaluation
             output.evaluation_uri = training_method.evaluate(model=output.model_uri)
 
-            # Run forecast
-            output.forecast_uri = training_method.forecast(
-                model=output.model_uri, parameters=forecast_parameters
+            # Run prediction
+            output.prediction_uri = training_method.predict(
+                model=output.model_uri, parameters=prediction_parameters
             )
         except Exception as exception:
             output.error_message = str(exception)

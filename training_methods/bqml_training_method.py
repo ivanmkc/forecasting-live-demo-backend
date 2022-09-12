@@ -10,11 +10,22 @@ from training_methods import training_method
 class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
     @staticmethod
     def training_method() -> str:
+        """A unique key representing this training method.
+
+        Returns:
+            str: The key
+        """
         return "bqml"
 
     def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
-        """
-        Train a job and return the results.
+        """Train a job and return the model URI.
+
+        Args:
+            dataset (dataset.Dataset): Input dataset.
+            parameters (Dict[str, Any]): The model training parameters.
+
+        Returns:
+            str: The model URI
         """
 
         time_column = parameters.get("time_column")
@@ -44,8 +55,13 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         return str(query_job.destination)
 
     def evaluate(self, model: str) -> str:
-        """
-        Run evaluation and return the BigQuery table.
+        """Evaluate a model and return the BigQuery URI to its evaluation table.
+
+        Args:
+            model (str): Model to evaluate.
+
+        Returns:
+            str: The BigQuery evaluation table URI.
         """
 
         query_job = self._evaluate(model=model)
@@ -55,11 +71,17 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
 
         return str(query_job.destination)
 
-    def forecast(self, model: str, parameters: Dict[str, Any]) -> str:
+    def predict(self, model: str, parameters: Dict[str, Any]) -> str:
+        """Predict using a model and return the BigQuery URI to its prediction table.
+
+        Args:
+            model (str): Model to evaluate.
+            parameters (Dict[str, Any]): The prediction parameters.
+
+        Returns:
+            str: The BigQuery prediction table URI.
         """
-        Run the forecast and return the table URI.
-        """
-        query_job = self._forecast(model=model, parameters=parameters)
+        query_job = self._predict(model=model, parameters=parameters)
 
         # Wait for result
         _ = query_job.result()
@@ -118,7 +140,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         # Start the query job
         return client.query(query)
 
-    def _forecast(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
+    def _predict(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
         client = bigquery.Client()
 
         query = f"""
