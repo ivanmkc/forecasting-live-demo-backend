@@ -7,32 +7,8 @@ from typing import Any, Awaitable, Dict, List, Optional, Tuple
 import pandas as pd
 from google.cloud import bigquery
 
-import utils
-from models import dataset, training_result
+from models import forecast_job_result, forecast_job_request
 from services import forecast_job_service
-
-
-@dataclasses.dataclass
-class ForecastJobRequest:
-    """An encapsulation of the training job request"""
-
-    # The unique key associated with a training method.
-    training_method: str
-
-    # The dataset used for model training.
-    dataset: dataset.Dataset
-
-    # The request start time.
-    start_time: datetime
-
-    # Parameters for training.
-    model_parameters: Dict[str, Any]
-
-    # Parameters for prediction.
-    prediction_parameters: Dict[str, Any]
-
-    # The unique request id.
-    id: str = dataclasses.field(default_factory=utils.generate_uuid)
 
 
 class ForecastJobCoordinator(abc.ABC):
@@ -42,7 +18,7 @@ class ForecastJobCoordinator(abc.ABC):
     """
 
     @abc.abstractmethod
-    def enqueue_job(self, request: ForecastJobRequest) -> str:
+    def enqueue_job(self, request: forecast_job_request.ForecastJobRequest) -> str:
         """Enqueue the request to a job queue for later processing.
 
         Args:
@@ -54,20 +30,20 @@ class ForecastJobCoordinator(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def list_pending_jobs(self) -> List[Dict[str, Any]]:
+    def list_pending_jobs(self) -> List[forecast_job_request.ForecastJobRequest]:
         """List pending jobs.
 
         Returns:
-            List[Dict[str, Any]]: The pending jobs.
+            List[ForecastJobRequest]: The pending jobs.
         """
         # TODO: Add pagination
         pass
 
-    def list_completed_jobs(self) -> List[training_result.ForecastJobResult]:
+    def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
         """List completed jobs.
 
         Returns:
-            List[training_result.TrainingResult]: The completed results.
+            List[forecast_job_result.ForecastJobResult]: The completed results.
         """
         pass
 
@@ -105,7 +81,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
     """
 
     def __init__(
-        self, training_service: forecast_job_service.ForecastJobService
+        self, forecast_job_service: forecast_job_service.ForecastJobService
     ) -> None:
         """Initializes the manager.
 
@@ -113,25 +89,25 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
             training_service (training_service.TrainingJobService): The service used by each worker to run the training job.
         """
         super().__init__()
-        self._training_service = training_service
+        self._forecast_job_service = forecast_job_service
         self._thread_pool_executor = futures.ThreadPoolExecutor()
-        self._pending_jobs: Dict[str, ForecastJobRequest] = {}
-        self._completed_jobs: Dict[str, training_result.ForecastJobResult] = {}
+        self._pending_jobs: Dict[str, forecast_job_result.ForecastJobRequest] = {}
+        self._completed_jobs: Dict[str, forecast_job_result.ForecastJobResult] = {}
         self._evaluation_uri_map: Dict[str, str] = {}
         self._prediction_uri_map: Dict[str, str] = {}
 
     def _process_request(
-        self, request: ForecastJobRequest
-    ) -> Tuple[str, training_result.ForecastJobResult]:
+        self, request: forecast_job_request.ForecastJobRequest
+    ) -> Tuple[str, forecast_job_result.ForecastJobResult]:
         """Process the training jobs request.
 
         Args:
             request (TrainingJobManagerRequest): The request
 
         Returns:
-            Tuple[str, training_result.TrainingResult]: The job id and result.
+            Tuple[str, forecast_job_result.ForecastJobResult]: The job id and result.
         """
-        training_result = self._training_service.run(
+        result = self._forecast_job_service.run(
             training_method_name=request.training_method,
             start_time=request.start_time,
             dataset=request.dataset,
@@ -139,27 +115,27 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
             prediction_parameters=request.prediction_parameters,
         )
 
-        return request.id, training_result
+        return request.id, result
 
-    def _append_completed_training_result(self, future: futures.Future):
+    def _append_completed_result(self, future: futures.Future):
         """Append the result to a cache. Used as a Future callback.
 
         Args:
             future (futures.Future): The future that will return the TrainingResult.
         """
-        output: Tuple[str, training_result.TrainingResult] = future.result()
+        output: Tuple[str, forecast_job_result.ForecastJobResult] = future.result()
 
         # Deconstruct
-        job_id, training_result = output
+        job_id, result = output
 
-        if training_result:
+        if result:
             # Clear pending job
             del self._pending_jobs[job_id]
 
             # Append completed training results
-            self._completed_jobs[job_id] = training_result
+            self._completed_jobs[job_id] = result
 
-    def enqueue_job(self, request: ForecastJobRequest) -> str:
+    def enqueue_job(self, request: forecast_job_request.ForecastJobRequest) -> str:
         """Enqueue the request to a job queue for later processing.
 
         Args:
@@ -171,45 +147,27 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         self._pending_jobs[request.id] = request
 
         future = self._thread_pool_executor.submit(self._process_request, request)
-        future.add_done_callback(self._append_completed_training_result)
+        future.add_done_callback(self._append_completed_result)
 
         return request.id
 
-    def list_pending_jobs(self) -> List[Dict[str, Any]]:
+    def list_pending_jobs(self) -> List[forecast_job_request.ForecastJobRequest]:
         """List pending jobs.
 
         Returns:
-            List[Dict[str, Any]]: The pending jobs.
+            List[ForecastJobRequest]: The pending jobs.
         """
         # TODO: Add pagination
-        return [
-            {
-                "job_id": request.id,
-                "training_method": request.training_method,
-                "dataset_id": request.dataset.id,
-                "model_parameters": request.model_parameters,
-                "prediction_parameters": request.prediction_parameters,
-                "start_time": request.start_time,
-            }
-            for request in self._pending_jobs.values()
-        ]
+        return list(self._pending_jobs.values())
 
-    def list_completed_jobs(self) -> List[training_result.ForecastJobResult]:
+    def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
         """List completed jobs.
 
         Returns:
-            List[training_result.TrainingResult]: The completed results.
+            List[forecast_job_result.ForecastJobResult]: The completed results.
         """
         # TODO: Add pagination
-        return [
-            {
-                "job_id": job_id,
-                "start_time": result.start_time,
-                "end_time": result.end_time,
-                "error_message": result.error_message,
-            }
-            for job_id, result in self._completed_jobs.items()
-        ]
+        return list(self._completed_jobs.values())
 
     def _get_bigquery_table_as_df(self, table_id: str) -> pd.DataFrame:
         client = bigquery.Client()

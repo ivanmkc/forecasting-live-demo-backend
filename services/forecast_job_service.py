@@ -2,7 +2,7 @@ import abc
 from datetime import datetime
 from typing import Any, Dict
 
-from models import dataset, training_result
+from models import dataset, forecast_job_result
 from training_methods import training_method
 
 
@@ -31,7 +31,7 @@ class ForecastJobService:
         dataset: dataset.Dataset,
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
-    ) -> training_result.ForecastJobResult:
+    ) -> forecast_job_result.ForecastJobResult:
         """Run model training, evaluation and prediction for a given `training_method_name`. Waits for completion.
 
         Args:
@@ -45,7 +45,7 @@ class ForecastJobService:
             ValueError: Any error that happens during training, evaluation or prediction.
 
         Returns:
-            training_result.TrainingResult: The results containing the URIs for each step.
+            forecast_job_result.ForecastJobResult: The results containing the URIs for each step.
         """
         training_method = self._training_registry.get(training_method_name)
 
@@ -55,9 +55,10 @@ class ForecastJobService:
             )
 
         # Start training
-        output = training_result.ForecastJobResult(
+        output = forecast_job_result.ForecastJobResult(
             start_time=start_time,
             end_time=datetime.now(),
+            dataset_id=dataset.id,
             model_uri=None,
             error_message=None,
         )

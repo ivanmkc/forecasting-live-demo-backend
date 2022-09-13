@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
+from models import forecast_job_request
 from services import dataset_service
 
 app = FastAPI()
@@ -24,7 +25,7 @@ training_service_instance = forecast_job_service.ForecastJobService(
     training_registry=training_registry
 )
 training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobManager(
-    training_service=training_service_instance
+    forecast_job_service=training_service_instance
 )
 
 
@@ -59,12 +60,47 @@ def preview_dataset(dataset_id: str):
 
 @app.get("/pending_jobs")
 def pending_jobs():
-    return training_jobs_manager_instance.list_pending_jobs()
+    jobs = training_jobs_manager_instance.list_pending_jobs()
+    return [
+        {
+            "job_id": request.id,
+            "training_method": request.training_method,
+            "dataset": {
+                "id": request.dataset.id,
+                "icon": request.dataset.icon,
+                "display_name": request.dataset.display_name,
+            },
+            "model_parameters": request.model_parameters,
+            "prediction_parameters": request.prediction_parameters,
+            "start_time": request.start_time,
+        }
+        for request in jobs
+    ]
 
 
 @app.get("/completed_jobs")
 def completed_jobs():
-    return training_jobs_manager_instance.list_completed_jobs()
+    jobs = training_jobs_manager_instance.list_completed_jobs()
+    return [
+        {
+            "job_id": job.id,
+            "request": {
+                "training_method": job.request.training_method,
+                "dataset": {
+                    "id": job.request.dataset.id,
+                    "icon": job.request.dataset.icon,
+                    "display_name": job.request.dataset.display_name,
+                },
+                "model_parameters": job.request.model_parameters,
+                "prediction_parameters": job.request.prediction_parameters,
+                "start_time": job.request.start_time,
+            },
+            "start_time": job.start_time,
+            "end_time": job.end_time,
+            "error_message": job.error_message,
+        }
+        for job in jobs
+    ]
 
 
 class ForecastJobAPIRequest(BaseModel):
@@ -95,7 +131,7 @@ def train(
         )
 
     job_id = training_jobs_manager_instance.enqueue_job(
-        forecast_job_coordinator.ForecastJobRequest(
+        forecast_job_request.ForecastJobRequest(
             start_time=datetime.now(),
             training_method=request.training_method,
             dataset=dataset,
@@ -115,7 +151,10 @@ async def evaluation(job_id: str):
     if evaluation is None:
         raise HTTPException(status_code=404, detail=f"Evaluation not found: {job_id}")
     else:
-        return evaluation.to_json(orient="records")
+        return {
+            "columns": evaluation.columns.tolist(),
+            "rows": evaluation.to_json(orient="records"),
+        }
 
 
 # Get prediction
@@ -126,4 +165,7 @@ async def prediction(job_id: str):
     if prediction is None:
         raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
     else:
-        return prediction.to_json(orient="records")
+        return {
+            "columns": prediction.columns.tolist(),
+            "rows": prediction.to_json(orient="records"),
+        }

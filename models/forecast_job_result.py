@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from models import forecast_job_request
+
 
 class ForecastJobResult:
     """
@@ -11,12 +13,13 @@ class ForecastJobResult:
         self,
         start_time: datetime,
         end_time: datetime,
+        request: forecast_job_request.ForecastJobRequest,
         model_uri: Optional[str] = None,
         evaluation_uri: Optional[Dict[str, Any]] = None,
         prediction_uri: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
     ) -> None:
-        """_summary_
+        """The forecast job results.
 
         Args:
             start_time (datetime): The request start time.
@@ -29,6 +32,7 @@ class ForecastJobResult:
         super().__init__()
         self.start_time = start_time
         self.end_time = end_time
+        self.request = request
         self.model_uri = model_uri
         self.evaluation_uri = evaluation_uri
         self.prediction_uri = prediction_uri
