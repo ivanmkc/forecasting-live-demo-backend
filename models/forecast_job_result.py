@@ -11,7 +11,6 @@ class ForecastJobResult:
 
     def __init__(
         self,
-        start_time: datetime,
         end_time: datetime,
         request: forecast_job_request.ForecastJobRequest,
         model_uri: Optional[str] = None,
@@ -30,7 +29,6 @@ class ForecastJobResult:
             error_message (Optional[str], optional): The error message encountered during training. Defaults to None.
         """
         super().__init__()
-        self.start_time = start_time
         self.end_time = end_time
         self.request = request
         self.model_uri = model_uri

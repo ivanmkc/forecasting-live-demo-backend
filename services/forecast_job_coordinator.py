@@ -108,7 +108,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
             Tuple[str, forecast_job_result.ForecastJobResult]: The job id and result.
         """
         result = self._forecast_job_service.run(
-            training_method_name=request.training_method,
+            training_method_name=request.training_method_name,
             start_time=request.start_time,
             dataset=request.dataset,
             model_parameters=request.model_parameters,

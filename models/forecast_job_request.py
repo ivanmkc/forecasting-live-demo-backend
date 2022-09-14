@@ -11,7 +11,7 @@ class ForecastJobRequest:
     """An encapsulation of the training job request"""
 
     # The unique key associated with a training method.
-    training_method: str
+    training_method_name: str
 
     # The dataset used for model training.
     dataset: dataset.Dataset

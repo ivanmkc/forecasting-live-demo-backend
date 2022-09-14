@@ -4,7 +4,11 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
-from training_methods import bqml_training_method, training_method
+from training_methods import (
+    bqml_training_method,
+    debug_training_method,
+    training_method,
+)
 
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, Optional
@@ -18,7 +22,8 @@ app = FastAPI()
 
 # TODO: Auto-detect registry
 training_registry: Dict[str, training_method.TrainingMethod] = {
-    bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod()
+    bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod(),
+    debug_training_method.DebugTrainingMethod.training_method(): debug_training_method.DebugTrainingMethod(),
 }
 
 training_service_instance = forecast_job_service.ForecastJobService(
@@ -64,7 +69,7 @@ def pending_jobs():
     return [
         {
             "job_id": request.id,
-            "training_method": request.training_method,
+            "training_method_name": request.training_method_name,
             "dataset": {
                 "id": request.dataset.id,
                 "icon": request.dataset.icon,
@@ -83,9 +88,9 @@ def completed_jobs():
     jobs = training_jobs_manager_instance.list_completed_jobs()
     return [
         {
-            "job_id": job.id,
+            "job_id": job.request.id,
             "request": {
-                "training_method": job.request.training_method,
+                "training_method_name": job.request.training_method_name,
                 "dataset": {
                     "id": job.request.dataset.id,
                     "icon": job.request.dataset.icon,
@@ -95,7 +100,6 @@ def completed_jobs():
                 "prediction_parameters": job.request.prediction_parameters,
                 "start_time": job.request.start_time,
             },
-            "start_time": job.start_time,
             "end_time": job.end_time,
             "error_message": job.error_message,
         }
@@ -107,13 +111,13 @@ class ForecastJobAPIRequest(BaseModel):
     """A forecast job request includes information to train a model, evaluate it and create a forecast prediction.
 
     Args:
-        training_method (str): The unique key associated with a training method.
+        training_method_name (str): The unique key associated with a training method.
         dataset_id (str): The dataset id to be used for training.
         model_parameters (Dict[str, Any]): Parameters for training.
         prediction_parameters (Dict[str, Any]): Parameters for training.
     """
 
-    training_method: str
+    training_method_name: str
     dataset_id: str
     model_parameters: Optional[Dict[str, Any]] = None
     prediction_parameters: Optional[Dict[str, Any]] = None
@@ -130,15 +134,21 @@ def train(
             status_code=404, detail=f"Dataset not found: {request.dataset_id}"
         )
 
-    job_id = training_jobs_manager_instance.enqueue_job(
-        forecast_job_request.ForecastJobRequest(
-            start_time=datetime.now(),
-            training_method=request.training_method,
-            dataset=dataset,
-            model_parameters=request.model_parameters or {},
-            prediction_parameters=request.prediction_parameters or {},
+    try:
+        job_id = training_jobs_manager_instance.enqueue_job(
+            forecast_job_request.ForecastJobRequest(
+                start_time=datetime.now(),
+                training_method_name=request.training_method_name,
+                dataset=dataset,
+                model_parameters=request.model_parameters or {},
+                prediction_parameters=request.prediction_parameters or {},
+            )
         )
-    )
+    except Exception as exception:
+        logger.error(str(exception))
+        raise HTTPException(
+            status_code=400, detail=f"There was a problem enqueueing your job"
+        )
 
     return {"job_id": job_id}
 
