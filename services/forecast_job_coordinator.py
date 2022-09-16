@@ -39,6 +39,16 @@ class ForecastJobCoordinator(abc.ABC):
         # TODO: Add pagination
         pass
 
+    def get_completed_jobs(
+        self, job_id: str
+    ) -> Optional[forecast_job_result.ForecastJobResult]:
+        """Get completed job by job_id.
+
+        Returns:
+            forecast_job_result.ForecastJobResult: The job.
+        """
+        pass
+
     def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
         """List completed jobs.
 
@@ -107,13 +117,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         Returns:
             Tuple[str, forecast_job_result.ForecastJobResult]: The job id and result.
         """
-        result = self._forecast_job_service.run(
-            training_method_name=request.training_method_name,
-            start_time=request.start_time,
-            dataset=request.dataset,
-            model_parameters=request.model_parameters,
-            prediction_parameters=request.prediction_parameters,
-        )
+        result = self._forecast_job_service.run(request=request)
 
         return request.id, result
 
@@ -159,6 +163,16 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         """
         # TODO: Add pagination
         return list(self._pending_jobs.values())
+
+    def get_completed_jobs(
+        self, job_id: str
+    ) -> Optional[forecast_job_result.ForecastJobResult]:
+        """Get completed job by job_id.
+
+        Returns:
+            forecast_job_result.ForecastJobResult: The job.
+        """
+        return self._completed_jobs.get(job_id)
 
     def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
         """List completed jobs.

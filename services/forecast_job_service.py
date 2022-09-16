@@ -59,7 +59,7 @@ class ForecastJobService:
         try:
             # Train model
             output.model_uri = training_method.train(
-                dataset=dataset, parameters=request.model_parameters
+                dataset=request.dataset, parameters=request.model_parameters
             )
 
             # Run evaluation

@@ -161,21 +161,67 @@ async def evaluation(job_id: str):
     if evaluation is None:
         raise HTTPException(status_code=404, detail=f"Evaluation not found: {job_id}")
     else:
+        evaluation = evaluation.fillna("")
+        evaluation["id"] = evaluation.index
+
         return {
             "columns": evaluation.columns.tolist(),
-            "rows": evaluation.to_json(orient="records"),
+            "rows": evaluation.to_dict(orient="records"),
         }
 
 
 # Get prediction
-@app.get("/prediction/{job_id}")
-async def prediction(job_id: str):
-    prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
+@app.get("/prediction/{job_id}/{output_type}")
+async def prediction(job_id: str, output_type: str):
+    try:
+        prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
+    except Exception as exception:
+        logger.error(str(exception))
+        raise HTTPException(
+            status_code=400, detail=f"There was a problem getting prediction: {job_id}"
+        )
 
     if prediction is None:
         raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
     else:
-        return {
-            "columns": prediction.columns.tolist(),
-            "rows": prediction.to_json(orient="records"),
-        }
+        prediction = prediction.fillna("")
+        if output_type == "table":
+            prediction["id"] = prediction.index
+
+            return {
+                "columns": prediction.columns.tolist(),
+                "rows": prediction.to_dict(orient="records"),
+            }
+        elif output_type == "plot":
+            job = training_jobs_manager_instance.get_completed_jobs(job_id=job_id)
+
+            group_column = "product_at_store"  # Figure out how to generalize this.
+            time_column = "forecast_timestamp"
+            target_column = "forecast_value"  # Figure out how to generalize this.
+
+            prediction_grouped = prediction.groupby(group_column)
+
+            group_time_value_map = {
+                k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
+                for k, v in prediction_grouped
+            }
+
+            unique_times = sorted(list(prediction[time_column].unique()))
+
+            datasets = [
+                {
+                    "label": group,
+                    "data": [time_values_map[time] for time in unique_times],
+                }
+                for group, time_values_map in group_time_value_map.items()
+            ]
+
+            return {
+                "time_labels": unique_times,
+                "datasets": datasets,
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported output type: {output_type}",
+            )
