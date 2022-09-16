@@ -38,12 +38,12 @@ class DebugTrainingMethod(training_method.TrainingMethod):
             parameters.get("delay_in_seconds", 5), MAX_DELAY_IN_SECONDS
         )
 
+        time.sleep(delay_in_seconds)
+
         error_message = parameters.get("error_message")
 
         if error_message:
             raise ValueError(error_message)
-
-        time.sleep(delay_in_seconds)
 
         return "debug.model"
 
