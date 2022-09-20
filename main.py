@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import numpy as np
 import pandas as pd
 
 from fastapi import FastAPI, HTTPException
@@ -165,10 +166,18 @@ async def evaluation(job_id: str):
         evaluation = evaluation.fillna("")
         evaluation["id"] = evaluation.index
 
-        return {
-            "columns": evaluation.columns.tolist(),
+        columns = evaluation.columns.tolist()
+        for column in columns:
+            evaluation[column] = evaluation[column].apply(
+                lambda x: x.tolist() if isinstance(x, np.ndarray) else x
+            )
+
+        output = {
+            "columns": columns,
             "rows": evaluation.to_dict(orient="records"),
         }
+
+        return output
 
 
 def format_for_rechart(
