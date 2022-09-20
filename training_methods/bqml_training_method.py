@@ -141,6 +141,11 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         return client.query(query)
 
     def _predict(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
+        forecast_horizon = parameters.get("forecast_horizon")
+
+        if forecast_horizon is None:
+            raise ValueError("forecast_horizon was not provided")
+
         client = bigquery.Client()
 
         query = f"""
@@ -148,7 +153,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             *
             FROM
             ML.FORECAST(MODEL `{model}`,
-                        STRUCT(30 AS horizon, 0.8 AS confidence_level))            
+                        STRUCT({forecast_horizon} AS horizon, 0.8 AS confidence_level))            
         """
 
         # Start the query job

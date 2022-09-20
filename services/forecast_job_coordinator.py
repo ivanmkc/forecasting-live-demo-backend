@@ -58,6 +58,20 @@ class ForecastJobCoordinator(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def get_request(
+        self, job_id: str
+    ) -> Optional[forecast_job_request.ForecastJobRequest]:
+        """Get the request dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[forecast_job_request.ForecastJobRequest]: The request.
+        """
+        pass
+
+    @abc.abstractmethod
     def get_evaluation(self, job_id: str) -> Optional[pd.DataFrame]:
         """Get the evaluation dataframe for a given job_id.
 
@@ -196,6 +210,32 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
 
         df = query_job.to_dataframe()
         return df
+
+    def get_request(
+        self, job_id: str
+    ) -> Optional[forecast_job_request.ForecastJobRequest]:
+        """Get the request dataframe for a given job_id.
+
+        Args:
+            job_id (str): Job id.
+
+        Returns:
+            Optional[forecast_job_request.ForecastJobRequest]: The request.
+        """
+        pending_job_request: forecast_job_request.ForecastJobRequest = (
+            self._pending_jobs.get(job_id)
+        )
+
+        if pending_job_request is not None:
+            return pending_job_request
+        else:
+            completed_job: forecast_job_result.ForecastJobResult = (
+                self._completed_jobs.get(job_id)
+            )
+            if completed_job is not None:
+                return completed_job.request
+
+        return None
 
     def get_evaluation(self, job_id: str) -> Optional[pd.DataFrame]:
         """Get the evaluation dataframe for a given job_id.
