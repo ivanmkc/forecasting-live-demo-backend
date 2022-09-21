@@ -12,6 +12,11 @@ MAX_DELAY_IN_SECONDS = 60
 
 
 class DebugTrainingMethod(training_method.TrainingMethod):
+    """Used to run a dummy training job for integration testing as the actual jobs can take a long time.
+
+    It can wait a specified number of seconds or error out, depending on the parameters passed to it.
+    """
+
     @staticmethod
     def training_method() -> str:
         """A unique key representing this training method.

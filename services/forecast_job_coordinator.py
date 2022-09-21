@@ -39,7 +39,7 @@ class ForecastJobCoordinator(abc.ABC):
         # TODO: Add pagination
         pass
 
-    def get_completed_jobs(
+    def get_completed_job(
         self, job_id: str
     ) -> Optional[forecast_job_result.ForecastJobResult]:
         """Get completed job by job_id.
@@ -61,7 +61,7 @@ class ForecastJobCoordinator(abc.ABC):
     def get_request(
         self, job_id: str
     ) -> Optional[forecast_job_request.ForecastJobRequest]:
-        """Get the request dataframe for a given job_id.
+        """Get the request for a given job_id.
 
         Args:
             job_id (str): Job id.
@@ -178,7 +178,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         # TODO: Add pagination
         return list(self._pending_jobs.values())
 
-    def get_completed_jobs(
+    def get_completed_job(
         self, job_id: str
     ) -> Optional[forecast_job_result.ForecastJobResult]:
         """Get completed job by job_id.
@@ -214,7 +214,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
     def get_request(
         self, job_id: str
     ) -> Optional[forecast_job_request.ForecastJobRequest]:
-        """Get the request dataframe for a given job_id.
+        """Get the request for a given job_id.
 
         Args:
             job_id (str): Job id.
