@@ -22,7 +22,7 @@
                 "--reload",
                 "--port=8000"
             ],
-            "justMyCode": false,
+            "justMyCode": true,
         },
         {
             "name": "Cloud Build: Build docker image",

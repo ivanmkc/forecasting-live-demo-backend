@@ -116,7 +116,7 @@ class CSVDataset(Dataset):
     @cached_property
     def df(self) -> pd.DataFrame:
         df = pd.read_csv(self.filepath_or_buffer)
-        df[self.time_column] = pd.to_datetime(df[self.time_column])
+        df[self.time_column] = pd.to_datetime(df[self.time_column], utc=True)
         return df
 
 

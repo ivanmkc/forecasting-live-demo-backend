@@ -2,7 +2,8 @@ import abc
 from datetime import datetime
 from typing import Any, Dict
 
-from models import dataset, training_result
+from models import dataset, forecast_job_result
+from models.forecast_job_request import ForecastJobRequest
 from training_methods import training_method
 
 
@@ -24,14 +25,7 @@ class ForecastJobService:
         # TODO: Register training methods
         self._training_registry = training_registry
 
-    def run(
-        self,
-        training_method_name: str,
-        start_time: datetime,
-        dataset: dataset.Dataset,
-        model_parameters: Dict[str, Any],
-        prediction_parameters: Dict[str, Any],
-    ) -> training_result.ForecastJobResult:
+    def run(self, request: ForecastJobRequest) -> forecast_job_result.ForecastJobResult:
         """Run model training, evaluation and prediction for a given `training_method_name`. Waits for completion.
 
         Args:
@@ -45,19 +39,19 @@ class ForecastJobService:
             ValueError: Any error that happens during training, evaluation or prediction.
 
         Returns:
-            training_result.TrainingResult: The results containing the URIs for each step.
+            forecast_job_result.ForecastJobResult: The results containing the URIs for each step.
         """
-        training_method = self._training_registry.get(training_method_name)
+        training_method = self._training_registry.get(request.training_method_name)
 
         if training_method is None:
             raise ValueError(
-                f"Training method '{training_method_name}' is not supported"
+                f"Training method '{request.training_method_name}' is not supported"
             )
 
         # Start training
-        output = training_result.ForecastJobResult(
-            start_time=start_time,
+        output = forecast_job_result.ForecastJobResult(
             end_time=datetime.now(),
+            request=request,
             model_uri=None,
             error_message=None,
         )
@@ -65,7 +59,7 @@ class ForecastJobService:
         try:
             # Train model
             output.model_uri = training_method.train(
-                dataset=dataset, parameters=model_parameters
+                dataset=request.dataset, parameters=request.model_parameters
             )
 
             # Run evaluation
@@ -73,7 +67,7 @@ class ForecastJobService:
 
             # Run prediction
             output.prediction_uri = training_method.predict(
-                model=output.model_uri, parameters=prediction_parameters
+                model=output.model_uri, parameters=request.prediction_parameters
             )
         except Exception as exception:
             output.error_message = str(exception)

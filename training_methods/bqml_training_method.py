@@ -8,6 +8,8 @@ from training_methods import training_method
 
 
 class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
+    """Used to run a BQML ARIMAPlus training job"""
+
     @staticmethod
     def training_method() -> str:
         """A unique key representing this training method.
@@ -109,7 +111,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             create or replace model `{project_id}.{dataset_id}.bqml_arima`
             options
             (model_type = 'ARIMA_PLUS',
-            time_series_timestamp_col = '{time_column}',
+                 = '{time_column}',
             time_series_data_col = '{target_column}',
             time_series_id_col = '{time_series_id_column}'
             ) as
@@ -141,6 +143,11 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         return client.query(query)
 
     def _predict(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
+        forecast_horizon = parameters.get("forecast_horizon")
+
+        if forecast_horizon is None:
+            raise ValueError("forecast_horizon was not provided")
+
         client = bigquery.Client()
 
         query = f"""
@@ -148,7 +155,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             *
             FROM
             ML.FORECAST(MODEL `{model}`,
-                        STRUCT(30 AS horizon, 0.8 AS confidence_level))            
+                        STRUCT({forecast_horizon} AS horizon, 0.8 AS confidence_level))            
         """
 
         # Start the query job
