@@ -111,7 +111,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             create or replace model `{project_id}.{dataset_id}.bqml_arima`
             options
             (model_type = 'ARIMA_PLUS',
-                 = '{time_column}',
+            time_series_timestamp_col = '{time_column}',
             time_series_data_col = '{target_column}',
             time_series_id_col = '{time_series_id_column}'
             ) as
