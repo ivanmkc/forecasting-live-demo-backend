@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from models import forecast_job_request
 
 
-class ForecastJobResult:
+class CompletedForecastJob:
     """
     Encapsulates the results of a train-eval-forecast job.
     """
@@ -35,3 +35,11 @@ class ForecastJobResult:
         self.evaluation_uri = evaluation_uri
         self.prediction_uri = prediction_uri
         self.error_message = error_message
+
+    def as_response(self) -> Dict:
+        return {
+            "job_id": self.request.id,
+            "request": self.request.as_response(),
+            "end_time": self.end_time,
+            "error_message": self.error_message,
+        }

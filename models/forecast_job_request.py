@@ -27,3 +27,16 @@ class ForecastJobRequest:
 
     # The unique request id.
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
+
+    def as_response(self) -> Dict:
+        return {
+            "training_method_name": self.training_method_name,
+            "dataset": {
+                "id": self.dataset.id,
+                "icon": self.dataset.icon,
+                "display_name": self.dataset.display_name,
+            },
+            "model_parameters": self.model_parameters,
+            "prediction_parameters": self.prediction_parameters,
+            "start_time": self.start_time,
+        }

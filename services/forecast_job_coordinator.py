@@ -2,12 +2,12 @@ import abc
 import dataclasses
 from concurrent import futures
 from datetime import datetime
-from typing import Any, Awaitable, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from google.cloud import bigquery
 
-from models import forecast_job_result, forecast_job_request
+from models import completed_forecast_job, forecast_job_request
 from services import forecast_job_service
 
 
@@ -39,21 +39,22 @@ class ForecastJobCoordinator(abc.ABC):
         # TODO: Add pagination
         pass
 
+    @abc.abstractmethod
     def get_completed_job(
         self, job_id: str
-    ) -> Optional[forecast_job_result.ForecastJobResult]:
+    ) -> Optional[completed_forecast_job.CompletedForecastJob]:
         """Get completed job by job_id.
 
         Returns:
-            forecast_job_result.ForecastJobResult: The job.
+            completed_forecast_job.ForecastJobResult: The job.
         """
         pass
 
-    def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
+    def list_completed_jobs(self) -> List[completed_forecast_job.CompletedForecastJob]:
         """List completed jobs.
 
         Returns:
-            List[forecast_job_result.ForecastJobResult]: The completed results.
+            List[completed_forecast_job.CompletedForecastJob]: The completed results.
         """
         pass
 
@@ -96,7 +97,7 @@ class ForecastJobCoordinator(abc.ABC):
         pass
 
 
-class MemoryTrainingJobManager(ForecastJobCoordinator):
+class MemoryTrainingJobCoordinator(ForecastJobCoordinator):
     """
     A job manager to queue jobs and delegate jobs to workers.
 
@@ -115,14 +116,16 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         super().__init__()
         self._forecast_job_service = forecast_job_service
         self._thread_pool_executor = futures.ThreadPoolExecutor()
-        self._pending_jobs: Dict[str, forecast_job_result.ForecastJobRequest] = {}
-        self._completed_jobs: Dict[str, forecast_job_result.ForecastJobResult] = {}
+        self._pending_jobs: Dict[str, completed_forecast_job.ForecastJobRequest] = {}
+        self._completed_jobs: Dict[
+            str, completed_forecast_job.CompletedForecastJob
+        ] = {}
         self._evaluation_uri_map: Dict[str, str] = {}
         self._prediction_uri_map: Dict[str, str] = {}
 
     def _process_request(
         self, request: forecast_job_request.ForecastJobRequest
-    ) -> Tuple[str, forecast_job_result.ForecastJobResult]:
+    ) -> Tuple[str, completed_forecast_job.CompletedForecastJob]:
         """Process the training jobs request.
 
         Args:
@@ -141,7 +144,9 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         Args:
             future (futures.Future): The future that will return the TrainingResult.
         """
-        output: Tuple[str, forecast_job_result.ForecastJobResult] = future.result()
+        output: Tuple[
+            str, completed_forecast_job.CompletedForecastJob
+        ] = future.result()
 
         # Deconstruct
         job_id, result = output
@@ -178,17 +183,7 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         # TODO: Add pagination
         return list(self._pending_jobs.values())
 
-    def get_completed_job(
-        self, job_id: str
-    ) -> Optional[forecast_job_result.ForecastJobResult]:
-        """Get completed job by job_id.
-
-        Returns:
-            forecast_job_result.ForecastJobResult: The job.
-        """
-        return self._completed_jobs.get(job_id)
-
-    def list_completed_jobs(self) -> List[forecast_job_result.ForecastJobResult]:
+    def list_completed_jobs(self) -> List[completed_forecast_job.CompletedForecastJob]:
         """List completed jobs.
 
         Returns:
@@ -229,13 +224,23 @@ class MemoryTrainingJobManager(ForecastJobCoordinator):
         if pending_job_request is not None:
             return pending_job_request
         else:
-            completed_job: forecast_job_result.ForecastJobResult = (
+            completed_job: completed_forecast_job.CompletedForecastJob = (
                 self._completed_jobs.get(job_id)
             )
             if completed_job is not None:
                 return completed_job.request
 
         return None
+
+    def get_completed_job(
+        self, job_id: str
+    ) -> Optional[completed_forecast_job.CompletedForecastJob]:
+        """Get completed job by job_id.
+
+        Returns:
+            completed_forecast_job.ForecastJobResult: The job.
+        """
+        return self._completed_jobs.get(job_id)
 
     def get_evaluation(self, job_id: str) -> Optional[pd.DataFrame]:
         """Get the evaluation dataframe for a given job_id.

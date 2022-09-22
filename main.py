@@ -31,7 +31,7 @@ training_registry: Dict[str, training_method.TrainingMethod] = {
 training_service_instance = forecast_job_service.ForecastJobService(
     training_registry=training_registry
 )
-training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobManager(
+training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobCoordinator(
     forecast_job_service=training_service_instance
 )
 
@@ -65,51 +65,31 @@ def preview_dataset(dataset_id: str):
         return target_dataset.df_preview.to_dict(orient="records")
 
 
+@app.get("/forecast_job/{job_id}")
+def get_forecast_job(job_id: str):
+    completed_job = training_jobs_manager_instance.get_completed_job(job_id=job_id)
+    pending_job = training_jobs_manager_instance.get_request(job_id=job_id)
+
+    return {
+        "status": "completed" if completed_job is not None else "pending",
+        "pending_job": pending_job.as_response() if pending_job else None,
+        "completed_job": completed_job.as_response() if completed_job else None,
+    }
+
+
 @app.get("/pending_jobs")
 def pending_jobs():
     jobs = training_jobs_manager_instance.list_pending_jobs()
-    return [
-        {
-            "job_id": request.id,
-            "training_method_name": request.training_method_name,
-            "dataset": {
-                "id": request.dataset.id,
-                "icon": request.dataset.icon,
-                "display_name": request.dataset.display_name,
-            },
-            "model_parameters": request.model_parameters,
-            "prediction_parameters": request.prediction_parameters,
-            "start_time": request.start_time,
-        }
-        for request in jobs
-    ]
+    return [pending_job_request.as_response() for pending_job_request in jobs]
 
 
 @app.get("/completed_jobs")
 def completed_jobs():
     jobs = training_jobs_manager_instance.list_completed_jobs()
-    return [
-        {
-            "job_id": job.request.id,
-            "request": {
-                "training_method_name": job.request.training_method_name,
-                "dataset": {
-                    "id": job.request.dataset.id,
-                    "icon": job.request.dataset.icon,
-                    "display_name": job.request.dataset.display_name,
-                },
-                "model_parameters": job.request.model_parameters,
-                "prediction_parameters": job.request.prediction_parameters,
-                "start_time": job.request.start_time,
-            },
-            "end_time": job.end_time,
-            "error_message": job.error_message,
-        }
-        for job in jobs
-    ]
+    return [job.as_response() for job in jobs]
 
 
-class ForecastJobAPIRequest(BaseModel):
+class SubmitForecastJobAPIRequest(BaseModel):
     """A forecast job request includes information to train a model, evaluate it and create a forecast prediction.
 
     Args:
@@ -125,9 +105,9 @@ class ForecastJobAPIRequest(BaseModel):
     prediction_parameters: Optional[Dict[str, Any]] = None
 
 
-@app.post("/train")
-def train(
-    request: ForecastJobAPIRequest,
+@app.post("/submit_forecast_job")
+def submitForecastJob(
+    request: SubmitForecastJobAPIRequest,
 ):
     dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
 
@@ -217,7 +197,7 @@ def format_for_rechart(
 @app.get("/prediction/{job_id}/{output_type}")
 async def prediction(job_id: str, output_type: str):
     try:
-        job_request = training_jobs_manager_instance.get_request(job_id=job_id)
+        job_request = training_jobs_manager_instance.get_pending_request(job_id=job_id)
 
         if job_request is None:
             raise HTTPException(

@@ -2,7 +2,7 @@ import abc
 from datetime import datetime
 from typing import Any, Dict
 
-from models import dataset, forecast_job_result
+from models import completed_forecast_job, dataset
 from models.forecast_job_request import ForecastJobRequest
 from training_methods import training_method
 
@@ -25,7 +25,9 @@ class ForecastJobService:
         # TODO: Register training methods
         self._training_registry = training_registry
 
-    def run(self, request: ForecastJobRequest) -> forecast_job_result.ForecastJobResult:
+    def run(
+        self, request: ForecastJobRequest
+    ) -> completed_forecast_job.CompletedForecastJob:
         """Run model training, evaluation and prediction for a given `training_method_name`. Waits for completion.
 
         Args:
@@ -49,7 +51,7 @@ class ForecastJobService:
             )
 
         # Start training
-        output = forecast_job_result.ForecastJobResult(
+        output = completed_forecast_job.CompletedForecastJob(
             end_time=datetime.now(),
             request=request,
             model_uri=None,
