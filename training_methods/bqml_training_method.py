@@ -30,18 +30,18 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             str: The model URI
         """
 
-        time_column = parameters.get("time_column")
-        target_column = parameters.get("target_column")
-        time_series_id_column = parameters.get("time_series_id_column")
+        time_column = parameters.get("timeColumn")
+        target_column = parameters.get("targetColumn")
+        time_series_id_column = parameters.get("timeSeriesIdentifierColumn")
 
         if time_column is None:
-            raise ValueError(f"Missing argument: time_column")
+            raise ValueError(f"Missing argument: timeColumn")
 
         if target_column is None:
-            raise ValueError(f"Missing argument: target_column")
+            raise ValueError(f"Missing argument: targetColumn")
 
         if time_series_id_column is None:
-            raise ValueError(f"Missing argument: time_column")
+            raise ValueError(f"Missing argument: timeSeriesIdentifierColumn")
 
         # Start training
         query_job = self._train(
@@ -143,10 +143,10 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         return client.query(query)
 
     def _predict(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
-        forecast_horizon = parameters.get("forecast_horizon")
+        forecast_horizon = parameters.get("forecastHorizon")
 
         if forecast_horizon is None:
-            raise ValueError("forecast_horizon was not provided")
+            raise ValueError("forecastHorizon was not provided")
 
         client = bigquery.Client()
 

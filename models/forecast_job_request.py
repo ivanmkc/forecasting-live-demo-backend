@@ -30,13 +30,14 @@ class ForecastJobRequest:
 
     def as_response(self) -> Dict:
         return {
-            "training_method_name": self.training_method_name,
+            "jobId": self.id,
+            "trainingMethodName": self.training_method_name,
             "dataset": {
                 "id": self.dataset.id,
                 "icon": self.dataset.icon,
-                "display_name": self.dataset.display_name,
+                "displayName": self.dataset.display_name,
             },
-            "model_parameters": self.model_parameters,
-            "prediction_parameters": self.prediction_parameters,
-            "start_time": self.start_time,
+            "modelParameters": self.model_parameters,
+            "predictionParameters": self.prediction_parameters,
+            "startTime": self.start_time,
         }

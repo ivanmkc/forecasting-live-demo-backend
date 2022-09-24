@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from humanize.time import precisedelta
 from typing import Any, Dict, Optional
 
 from models import forecast_job_request
@@ -36,10 +37,15 @@ class CompletedForecastJob:
         self.prediction_uri = prediction_uri
         self.error_message = error_message
 
+    @property
+    def duration(self) -> timedelta:
+        return self.end_time - self.request.start_time
+
     def as_response(self) -> Dict:
         return {
-            "job_id": self.request.id,
+            "jobId": self.request.id,
             "request": self.request.as_response(),
-            "end_time": self.end_time,
-            "error_message": self.error_message,
+            "endTime": self.end_time,
+            "duration": precisedelta(self.duration),
+            "errorMessage": self.error_message,
         }

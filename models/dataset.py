@@ -51,19 +51,19 @@ class Dataset(abc.ABC):
 
         return time_values.max()
 
-    def to_dict(self) -> Dict:
+    def as_response(self) -> Dict:
         df_preview = self.df_preview.fillna("").sort_values(self.time_column)
         df_preview["id"] = df_preview.index
 
         return {
             "id": self.id,
-            "display_name": self.display_name,
+            "displayName": self.display_name,
             "description": self.description,
             "icon": self.icon,
-            "start_date": self.start_date.strftime("%m/%d/%Y"),
-            "end_date": self.end_date.strftime("%m/%d/%Y"),
+            "startDate": self.start_date.strftime("%m/%d/%Y"),
+            "endDate": self.end_date.strftime("%m/%d/%Y"),
             "columns": self.columns,
-            "df_preview": df_preview.to_dict("records"),
+            "dfPreview": df_preview.to_dict("records"),
         }
 
     def get_bigquery_uri(
