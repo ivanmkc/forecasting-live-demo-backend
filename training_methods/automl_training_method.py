@@ -206,7 +206,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         return str(job.destination)
       else:
-        raise ValueError("Model evaluation data does not exist for model {model}!")
+        raise ValueError(f"Model evaluation data does not exist for model {model_name}!")
 
 
     def _predict(
