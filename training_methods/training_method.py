@@ -16,12 +16,18 @@ class TrainingMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    def train(
+        self,
+        dataset: dataset.Dataset,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Train a job and return the model URI.
 
         Args:
             dataset (dataset.Dataset): Input dataset.
-            parameters (Dict[str, Any]): The model training parameters.
+            model_parameters (Dict[str, Any]): The model training parameters.
+            prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The model URI

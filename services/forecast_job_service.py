@@ -52,7 +52,7 @@ class ForecastJobService:
 
         # Start training
         output = completed_forecast_job.CompletedForecastJob(
-            end_time=datetime.now(),
+            end_time=datetime.now(),  # Placeholder time
             request=request,
             model_uri=None,
             error_message=None,
@@ -61,7 +61,9 @@ class ForecastJobService:
         try:
             # Train model
             output.model_uri = training_method.train(
-                dataset=request.dataset, parameters=request.model_parameters
+                dataset=request.dataset,
+                model_parameters=request.model_parameters,
+                prediction_parameters=request.prediction_parameters,
             )
 
             # Run evaluation
@@ -73,5 +75,7 @@ class ForecastJobService:
             )
         except Exception as exception:
             output.error_message = str(exception)
+        finally:
+            output.end_time = datetime.now()
 
         return output

@@ -46,6 +46,5 @@ class CompletedForecastJob:
             "jobId": self.request.id,
             "request": self.request.as_response(),
             "endTime": self.end_time,
-            "duration": precisedelta(self.duration),
             "errorMessage": self.error_message,
         }

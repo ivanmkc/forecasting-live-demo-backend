@@ -27,12 +27,18 @@ class DebugTrainingMethod(training_method.TrainingMethod):
 
         return "debug"
 
-    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    def train(
+        self,
+        dataset: dataset.Dataset,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Train a job and return the model URI.
 
         Args:
             dataset (dataset.Dataset): Input dataset.
-            parameters (Dict[str, Any]): The model training parameters.
+            model_parameters (Dict[str, Any]): The model training parameters.
+            prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The model URI
@@ -40,12 +46,12 @@ class DebugTrainingMethod(training_method.TrainingMethod):
 
         # Sleep for a specified delay, not more than a max.
         delay_in_seconds = min(
-            parameters.get("delay_in_seconds", 5), MAX_DELAY_IN_SECONDS
+            model_parameters.get("delay_in_seconds", 5), MAX_DELAY_IN_SECONDS
         )
 
         time.sleep(delay_in_seconds)
 
-        error_message = parameters.get("error_message")
+        error_message = model_parameters.get("error_message")
 
         if error_message:
             raise ValueError(error_message)

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
@@ -33,6 +34,15 @@ training_service_instance = forecast_job_service.ForecastJobService(
 )
 training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobCoordinator(
     forecast_job_service=training_service_instance
+)
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -68,25 +78,31 @@ def preview_dataset(dataset_id: str):
 @app.get("/forecast-job/{job_id}")
 def get_forecast_job(job_id: str):
     completed_job = training_jobs_manager_instance.get_completed_job(job_id=job_id)
-    pending_job = training_jobs_manager_instance.get_request(job_id=job_id)
+    pending_job_request = training_jobs_manager_instance.get_request(job_id=job_id)
 
-    return {
-        "status": "completed" if completed_job is not None else "pending",
-        "pendingJob": pending_job.as_response() if pending_job else None,
-        "completedJob": completed_job.as_response() if completed_job else None,
-    }
-
-
-@app.get("/pending-jobs")
-def pending_jobs():
-    jobs = training_jobs_manager_instance.list_pending_jobs()
-    return [pending_job_request.as_response() for pending_job_request in jobs]
+    if completed_job is not None:
+        return completed_job.as_response()
+    else:
+        return {
+            "jobId": pending_job_request.id,
+            "request": pending_job_request.as_response(),
+        }
 
 
-@app.get("/completed-jobs")
-def completed_jobs():
-    jobs = training_jobs_manager_instance.list_completed_jobs()
-    return [job.as_response() for job in jobs]
+@app.get("/jobs")
+def jobs():
+    pending_jobs = [
+        {
+            "jobId": job.id,
+            "request": job.as_response(),
+        }
+        for job in training_jobs_manager_instance.list_pending_jobs()
+    ]
+    completed_jobs = [
+        job.as_response()
+        for job in training_jobs_manager_instance.list_completed_jobs()
+    ]
+    return pending_jobs + completed_jobs
 
 
 class SubmitForecastJobAPIRequest(BaseModel):
@@ -177,7 +193,7 @@ def format_for_rechart(
 
     data = [
         {
-            "name": time,
+            "name": time.isoformat(),
             **{
                 group: time_values_map.get(time)
                 for group, time_values_map in group_time_value_map.items()
@@ -188,8 +204,8 @@ def format_for_rechart(
 
     return (
         data,
-        unique_times[0] if len(unique_times) > 0 else None,
-        unique_times[-1] if len(unique_times) > 0 else None,
+        unique_times[0].isoformat() if len(unique_times) > 0 else None,
+        unique_times[-1].isoformat() if len(unique_times) > 0 else None,
     )
 
 
