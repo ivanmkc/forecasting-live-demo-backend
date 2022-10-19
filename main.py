@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+import datetime
 import numpy as np
 import pandas as pd
 
@@ -135,7 +135,7 @@ def submitForecastJob(
     try:
         job_id = training_jobs_manager_instance.enqueue_job(
             forecast_job_request.ForecastJobRequest(
-                start_time=datetime.now(),
+                start_time=datetime.datetime.now(datetime.timezone.utc),
                 training_method_name=request.trainingMethodName,
                 dataset=dataset,
                 model_parameters=request.modelParameters or {},
@@ -178,11 +178,13 @@ async def evaluation(job_id: str):
 
 def format_for_rechart(
     group_column: str, time_column: str, target_column: str, data: pd.DataFrame
-) -> Tuple[List[Dict[str, Any]], Optional[datetime], Optional[datetime]]:
+) -> Tuple[
+    List[Dict[str, Any]], Optional[datetime.datetime], Optional[datetime.datetime]
+]:
 
     data_grouped = data.groupby(group_column)
 
-    # Creeate a map of group to map of time-to-values
+    # Create a map of group to map of time-to-values
     # i.e. group_time_value_map[group_id][time_id] = target_value
     group_time_value_map = {
         k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))

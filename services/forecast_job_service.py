@@ -1,5 +1,5 @@
 import abc
-from datetime import datetime
+import datetime
 from typing import Any, Dict
 
 from models import completed_forecast_job, dataset
@@ -32,7 +32,7 @@ class ForecastJobService:
 
         Args:
             training_method_name (str): The training method name as defined in the training registry.
-            start_time (datetime): Start time of job.
+            start_time (datetime.datetime): Start time of job.
             dataset (dataset.Dataset): The dataset used for training.
             model_parameters (Dict[str, Any]): The parameters for training.
             prediction_parameters (Dict[str, Any]): The paramters for prediction.
@@ -52,7 +52,7 @@ class ForecastJobService:
 
         # Start training
         output = completed_forecast_job.CompletedForecastJob(
-            end_time=datetime.now(),  # Placeholder time
+            end_time=datetime.datetime.now(datetime.timezone.utc),  # Placeholder time
             request=request,
             model_uri=None,
             error_message=None,
@@ -76,6 +76,6 @@ class ForecastJobService:
         except Exception as exception:
             output.error_message = str(exception)
         finally:
-            output.end_time = datetime.now()
+            output.end_time = datetime.datetime.now(datetime.timezone.utc)
 
         return output

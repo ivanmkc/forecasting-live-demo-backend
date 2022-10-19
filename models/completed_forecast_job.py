@@ -22,8 +22,8 @@ class CompletedForecastJob:
         """The forecast job results.
 
         Args:
-            start_time (datetime): The request start time.
-            start_time (datetime): The request end time.
+            start_time (datetime.datetime): The request start time.
+            start_time (datetime.datetime): The request end time.
             model_uri (Optional[str], optional): The URI to the model. Defaults to None.
             evaluation_uri (Optional[Dict[str, Any]], optional): The BigQuery URI of the evaluation. Defaults to None.
             prediction_uri (Optional[Dict[str, Any]], optional): The BigQuery URI of the prediction. Defaults to None.
