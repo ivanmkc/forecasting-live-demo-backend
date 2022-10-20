@@ -5,13 +5,23 @@ from models import dataset
 
 
 class TrainingMethod(abc.ABC):
-    @staticmethod
+    @property
     @abc.abstractmethod
-    def training_method() -> str:
-        """A unique key representing this training method.
+    def id(self) -> str:
+        """A unique id representing this training method.
 
         Returns:
-            str: The key
+            str: The id
+        """
+        pass
+
+    @property
+    @abc.abstractmethod
+    def display_name(self) -> str:
+        """A display_name representing this training method.
+
+        Returns:
+            str: The name
         """
         pass
 
