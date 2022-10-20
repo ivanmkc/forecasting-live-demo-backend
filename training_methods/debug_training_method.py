@@ -17,15 +17,24 @@ class DebugTrainingMethod(training_method.TrainingMethod):
     It can wait a specified number of seconds or error out, depending on the parameters passed to it.
     """
 
-    @staticmethod
-    def training_method() -> str:
-        """A unique key representing this training method.
+    @property
+    def id(self) -> str:
+        """A unique id representing this training method.
 
         Returns:
-            str: The key
+            str: The id
         """
 
         return "debug"
+
+    @property
+    def display_name(self) -> str:
+        """A display_name representing this training method.
+
+        Returns:
+            str: The name
+        """
+        return "Debug"
 
     def train(
         self,

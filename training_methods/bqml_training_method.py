@@ -10,14 +10,23 @@ from training_methods import training_method
 class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
     """Used to run a BQML ARIMAPlus training job"""
 
-    @staticmethod
-    def training_method() -> str:
-        """A unique key representing this training method.
+    @property
+    def id(self) -> str:
+        """A unique id representing this training method.
 
         Returns:
-            str: The key
+            str: The id
         """
         return "bqml"
+
+    @property
+    def display_name(self) -> str:
+        """A display_name representing this training method.
+
+        Returns:
+            str: The name
+        """
+        return "BQML ARIMA+"
 
     def train(
         self,

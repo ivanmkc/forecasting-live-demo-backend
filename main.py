@@ -23,11 +23,15 @@ from services import dataset_service
 
 app = FastAPI()
 
-# TODO: Auto-detect registry
+# Auto-detect all imported training methods
 training_registry: Dict[str, training_method.TrainingMethod] = {
-    bqml_training_method.BQMLARIMAPlusTrainingMethod.training_method(): bqml_training_method.BQMLARIMAPlusTrainingMethod(),
-    debug_training_method.DebugTrainingMethod.training_method(): debug_training_method.DebugTrainingMethod(),
+    method.id: method
+    for method in [
+        method_class()
+        for method_class in training_method.TrainingMethod.__subclasses__()
+    ]
 }
+
 
 training_service_instance = forecast_job_service.ForecastJobService(
     training_registry=training_registry
@@ -126,17 +130,24 @@ def submitForecastJob(
     request: SubmitForecastJobAPIRequest,
 ):
     dataset = dataset_service.get_dataset(dataset_id=request.datasetId)
+    training_method = training_registry.get(request.trainingMethodName)
 
     if dataset is None:
         raise HTTPException(
             status_code=404, detail=f"Dataset not found: {request.datasetId}"
         )
 
+    if training_method is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Training method not found: {request.trainingMethodName}",
+        )
+
     try:
         job_id = training_jobs_manager_instance.enqueue_job(
             forecast_job_request.ForecastJobRequest(
                 start_time=datetime.datetime.now(datetime.timezone.utc),
-                training_method_name=request.trainingMethodName,
+                training_method_name=training_method.display_name,
                 dataset=dataset,
                 model_parameters=request.modelParameters or {},
                 prediction_parameters=request.predictionParameters or {},
