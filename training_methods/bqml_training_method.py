@@ -19,29 +19,36 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         """
         return "bqml"
 
-    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    def train(
+        self,
+        dataset: dataset.Dataset,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Train a job and return the model URI.
 
         Args:
             dataset (dataset.Dataset): Input dataset.
-            parameters (Dict[str, Any]): The model training parameters.
+            model_parameters (Dict[str, Any]): The model training parameters.
+            prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The model URI
         """
 
-        time_column = parameters.get("time_column")
-        target_column = parameters.get("target_column")
-        time_series_id_column = parameters.get("time_series_id_column")
+        time_column = model_parameters.get("timeColumn")
+        target_column = model_parameters.get("targetColumn")
+        time_series_id_column = model_parameters.get("timeSeriesIdentifierColumn")
+        forecast_horizon = prediction_parameters.get("forecastHorizon")
 
         if time_column is None:
-            raise ValueError(f"Missing argument: time_column")
+            raise ValueError(f"Missing argument: timeColumn")
 
         if target_column is None:
-            raise ValueError(f"Missing argument: target_column")
+            raise ValueError(f"Missing argument: targetColumn")
 
         if time_series_id_column is None:
-            raise ValueError(f"Missing argument: time_column")
+            raise ValueError(f"Missing argument: timeSeriesIdentifierColumn")
 
         # Start training
         query_job = self._train(
@@ -49,6 +56,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             time_column=time_column,
             target_column=target_column,
             time_series_id_column=time_series_id_column,
+            forecast_horizon=forecast_horizon,
         )
 
         # Wait for result
@@ -96,6 +104,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         time_column: str,
         target_column: str,
         time_series_id_column: str,
+        forecast_horizon: int,
     ) -> bigquery.QueryJob:
         client = bigquery.Client()
         project_id = client.project
@@ -108,18 +117,19 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         bigquery_uri = dataset.get_bigquery_uri(time_column=time_column)
 
         query = f"""
-            create or replace model `{project_id}.{dataset_id}.bqml_arima`
-            options
-            (model_type = 'ARIMA_PLUS',
-                 = '{time_column}',
-            time_series_data_col = '{target_column}',
-            time_series_id_col = '{time_series_id_column}'
-            ) as
-            select
+            CREATE OR REPLACE MODEL `{project_id}.{dataset_id}.bqml_arima`
+            OPTIONS
+            (MODEL_TYPE = 'ARIMA_PLUS',
+            TIME_SERIES_TIMESTAMP_COL = '{time_column}',
+            TIME_SERIES_DATA_COL = '{target_column}',
+            TIME_SERIES_ID_COL = '{time_series_id_column}',
+            HORIZON = {forecast_horizon}
+            ) AS
+            SELECT
             {time_column},
             {target_column},
             {time_series_id_column}
-            from
+            FROM
             `{bigquery_uri}`
         """
 
@@ -143,10 +153,10 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         return client.query(query)
 
     def _predict(self, model: str, parameters: Dict[str, Any]) -> bigquery.QueryJob:
-        forecast_horizon = parameters.get("forecast_horizon")
+        forecast_horizon = parameters.get("forecastHorizon")
 
         if forecast_horizon is None:
-            raise ValueError("forecast_horizon was not provided")
+            raise ValueError("forecastHorizon was not provided")
 
         client = bigquery.Client()
 

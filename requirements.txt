@@ -1,4 +1,5 @@
 fastapi
+humanize
 uvicorn[standard]
 pandas
 prophet

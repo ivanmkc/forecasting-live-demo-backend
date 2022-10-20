@@ -1,9 +1,10 @@
 import logging
-from datetime import datetime
+import datetime
 import numpy as np
 import pandas as pd
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
@@ -31,14 +32,23 @@ training_registry: Dict[str, training_method.TrainingMethod] = {
 training_service_instance = forecast_job_service.ForecastJobService(
     training_registry=training_registry
 )
-training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobManager(
+training_jobs_manager_instance = forecast_job_coordinator.MemoryTrainingJobCoordinator(
     forecast_job_service=training_service_instance
+)
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
 @app.get("/datasets")
 async def datasets():
-    return [dataset.to_dict() for dataset in dataset_service.get_datasets()]
+    return [dataset.as_response() for dataset in dataset_service.get_datasets()]
 
 
 @app.get("/dataset/{dataset_id}")
@@ -52,7 +62,7 @@ def get_dataset(dataset_id: str):
         return dataset
 
 
-@app.get("/preview_dataset/{dataset_id}")
+@app.get("/preview-dataset/{dataset_id}")
 def preview_dataset(dataset_id: str):
 
     target_dataset = dataset_service.get_dataset(dataset_id)
@@ -65,51 +75,37 @@ def preview_dataset(dataset_id: str):
         return target_dataset.df_preview.to_dict(orient="records")
 
 
-@app.get("/pending_jobs")
-def pending_jobs():
-    jobs = training_jobs_manager_instance.list_pending_jobs()
-    return [
-        {
-            "job_id": request.id,
-            "training_method_name": request.training_method_name,
-            "dataset": {
-                "id": request.dataset.id,
-                "icon": request.dataset.icon,
-                "display_name": request.dataset.display_name,
-            },
-            "model_parameters": request.model_parameters,
-            "prediction_parameters": request.prediction_parameters,
-            "start_time": request.start_time,
+@app.get("/forecast-job/{job_id}")
+def get_forecast_job(job_id: str):
+    completed_job = training_jobs_manager_instance.get_completed_job(job_id=job_id)
+    pending_job_request = training_jobs_manager_instance.get_request(job_id=job_id)
+
+    if completed_job is not None:
+        return completed_job.as_response()
+    else:
+        return {
+            "jobId": pending_job_request.id,
+            "request": pending_job_request.as_response(),
         }
-        for request in jobs
-    ]
 
 
-@app.get("/completed_jobs")
-def completed_jobs():
-    jobs = training_jobs_manager_instance.list_completed_jobs()
-    return [
+@app.get("/jobs")
+def jobs():
+    pending_jobs = [
         {
-            "job_id": job.request.id,
-            "request": {
-                "training_method_name": job.request.training_method_name,
-                "dataset": {
-                    "id": job.request.dataset.id,
-                    "icon": job.request.dataset.icon,
-                    "display_name": job.request.dataset.display_name,
-                },
-                "model_parameters": job.request.model_parameters,
-                "prediction_parameters": job.request.prediction_parameters,
-                "start_time": job.request.start_time,
-            },
-            "end_time": job.end_time,
-            "error_message": job.error_message,
+            "jobId": job.id,
+            "request": job.as_response(),
         }
-        for job in jobs
+        for job in training_jobs_manager_instance.list_pending_jobs()
     ]
+    completed_jobs = [
+        job.as_response()
+        for job in training_jobs_manager_instance.list_completed_jobs()
+    ]
+    return pending_jobs + completed_jobs
 
 
-class ForecastJobAPIRequest(BaseModel):
+class SubmitForecastJobAPIRequest(BaseModel):
     """A forecast job request includes information to train a model, evaluate it and create a forecast prediction.
 
     Args:
@@ -119,31 +115,31 @@ class ForecastJobAPIRequest(BaseModel):
         prediction_parameters (Dict[str, Any]): Parameters for training.
     """
 
-    training_method_name: str
-    dataset_id: str
-    model_parameters: Optional[Dict[str, Any]] = None
-    prediction_parameters: Optional[Dict[str, Any]] = None
+    trainingMethodName: str
+    datasetId: str
+    modelParameters: Optional[Dict[str, Any]] = None
+    predictionParameters: Optional[Dict[str, Any]] = None
 
 
-@app.post("/train")
-def train(
-    request: ForecastJobAPIRequest,
+@app.post("/submit-forecast-job")
+def submitForecastJob(
+    request: SubmitForecastJobAPIRequest,
 ):
-    dataset = dataset_service.get_dataset(dataset_id=request.dataset_id)
+    dataset = dataset_service.get_dataset(dataset_id=request.datasetId)
 
     if dataset is None:
         raise HTTPException(
-            status_code=404, detail=f"Dataset not found: {request.dataset_id}"
+            status_code=404, detail=f"Dataset not found: {request.datasetId}"
         )
 
     try:
         job_id = training_jobs_manager_instance.enqueue_job(
             forecast_job_request.ForecastJobRequest(
-                start_time=datetime.now(),
-                training_method_name=request.training_method_name,
+                start_time=datetime.datetime.now(datetime.timezone.utc),
+                training_method_name=request.trainingMethodName,
                 dataset=dataset,
-                model_parameters=request.model_parameters or {},
-                prediction_parameters=request.prediction_parameters or {},
+                model_parameters=request.modelParameters or {},
+                prediction_parameters=request.predictionParameters or {},
             )
         )
     except Exception as exception:
@@ -152,7 +148,7 @@ def train(
             status_code=400, detail=f"There was a problem enqueueing your job"
         )
 
-    return {"job_id": job_id}
+    return {"jobId": job_id}
 
 
 # Get evaluation
@@ -182,11 +178,13 @@ async def evaluation(job_id: str):
 
 def format_for_rechart(
     group_column: str, time_column: str, target_column: str, data: pd.DataFrame
-) -> Tuple[List[Dict[str, Any]], Optional[datetime], Optional[datetime]]:
+) -> Tuple[
+    List[Dict[str, Any]], Optional[datetime.datetime], Optional[datetime.datetime]
+]:
 
     data_grouped = data.groupby(group_column)
 
-    # Creeate a map of group to map of time-to-values
+    # Create a map of group to map of time-to-values
     # i.e. group_time_value_map[group_id][time_id] = target_value
     group_time_value_map = {
         k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
@@ -197,7 +195,7 @@ def format_for_rechart(
 
     data = [
         {
-            "name": time,
+            "name": time.isoformat(),
             **{
                 group: time_values_map.get(time)
                 for group, time_values_map in group_time_value_map.items()
@@ -208,8 +206,8 @@ def format_for_rechart(
 
     return (
         data,
-        unique_times[0] if len(unique_times) > 0 else None,
-        unique_times[-1] if len(unique_times) > 0 else None,
+        unique_times[0].isoformat() if len(unique_times) > 0 else None,
+        unique_times[-1].isoformat() if len(unique_times) > 0 else None,
     )
 
 
@@ -266,7 +264,7 @@ async def prediction(job_id: str, output_type: str):
             ]
 
             return {
-                "time_labels": unique_times,
+                "timeLabels": unique_times,
                 "datasets": datasets,
             }
         elif output_type == "recharts":
@@ -275,9 +273,9 @@ async def prediction(job_id: str, output_type: str):
             target_column = "forecast_value"  # Figure out how to generalize this.
 
             history_formatted, history_min_date, history_max_date = format_for_rechart(
-                group_column=job_request.model_parameters["time_series_id_column"],
-                time_column=job_request.model_parameters["time_column"],
-                target_column=job_request.model_parameters["target_column"],
+                group_column=job_request.model_parameters["timeSeriesIdentifierColumn"],
+                time_column=job_request.model_parameters["timeColumn"],
+                target_column=job_request.model_parameters["targetColumn"],
                 data=df_history,
             )
 
@@ -296,11 +294,11 @@ async def prediction(job_id: str, output_type: str):
                 "groups": df_prediction[group_column].unique().tolist(),
                 "data": history_formatted + predictions_formatted,
                 # "history": history_formatted,
-                "history_min_date": history_min_date,
-                "history_max_date": history_max_date,
+                "historyMinDate": history_min_date,
+                "historyMaxDate": history_max_date,
                 # "predictions": predictions_formatted,
-                "predictions_min_date": predictions_min_date,
-                "predictions_max_date": predictions_max_date,
+                "predictionsMinDate": predictions_min_date,
+                "predictionsMaxDate": predictions_max_date,
             }
         else:
             raise HTTPException(

@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from humanize.time import precisedelta
 from typing import Any, Dict, Optional
 
 from models import forecast_job_request
 
 
-class ForecastJobResult:
+class CompletedForecastJob:
     """
     Encapsulates the results of a train-eval-forecast job.
     """
@@ -21,8 +22,8 @@ class ForecastJobResult:
         """The forecast job results.
 
         Args:
-            start_time (datetime): The request start time.
-            start_time (datetime): The request end time.
+            start_time (datetime.datetime): The request start time.
+            start_time (datetime.datetime): The request end time.
             model_uri (Optional[str], optional): The URI to the model. Defaults to None.
             evaluation_uri (Optional[Dict[str, Any]], optional): The BigQuery URI of the evaluation. Defaults to None.
             prediction_uri (Optional[Dict[str, Any]], optional): The BigQuery URI of the prediction. Defaults to None.
@@ -35,3 +36,15 @@ class ForecastJobResult:
         self.evaluation_uri = evaluation_uri
         self.prediction_uri = prediction_uri
         self.error_message = error_message
+
+    @property
+    def duration(self) -> timedelta:
+        return self.end_time - self.request.start_time
+
+    def as_response(self) -> Dict:
+        return {
+            "jobId": self.request.id,
+            "request": self.request.as_response(),
+            "endTime": self.end_time,
+            "errorMessage": self.error_message,
+        }

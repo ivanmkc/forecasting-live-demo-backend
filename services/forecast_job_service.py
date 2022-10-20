@@ -1,8 +1,8 @@
 import abc
-from datetime import datetime
+import datetime
 from typing import Any, Dict
 
-from models import dataset, forecast_job_result
+from models import completed_forecast_job, dataset
 from models.forecast_job_request import ForecastJobRequest
 from training_methods import training_method
 
@@ -25,12 +25,14 @@ class ForecastJobService:
         # TODO: Register training methods
         self._training_registry = training_registry
 
-    def run(self, request: ForecastJobRequest) -> forecast_job_result.ForecastJobResult:
+    def run(
+        self, request: ForecastJobRequest
+    ) -> completed_forecast_job.CompletedForecastJob:
         """Run model training, evaluation and prediction for a given `training_method_name`. Waits for completion.
 
         Args:
             training_method_name (str): The training method name as defined in the training registry.
-            start_time (datetime): Start time of job.
+            start_time (datetime.datetime): Start time of job.
             dataset (dataset.Dataset): The dataset used for training.
             model_parameters (Dict[str, Any]): The parameters for training.
             prediction_parameters (Dict[str, Any]): The paramters for prediction.
@@ -49,8 +51,8 @@ class ForecastJobService:
             )
 
         # Start training
-        output = forecast_job_result.ForecastJobResult(
-            end_time=datetime.now(),
+        output = completed_forecast_job.CompletedForecastJob(
+            end_time=datetime.datetime.now(datetime.timezone.utc),  # Placeholder time
             request=request,
             model_uri=None,
             error_message=None,
@@ -59,7 +61,9 @@ class ForecastJobService:
         try:
             # Train model
             output.model_uri = training_method.train(
-                dataset=request.dataset, parameters=request.model_parameters
+                dataset=request.dataset,
+                model_parameters=request.model_parameters,
+                prediction_parameters=request.prediction_parameters,
             )
 
             # Run evaluation
@@ -71,5 +75,7 @@ class ForecastJobService:
             )
         except Exception as exception:
             output.error_message = str(exception)
+        finally:
+            output.end_time = datetime.datetime.now(datetime.timezone.utc)
 
         return output
