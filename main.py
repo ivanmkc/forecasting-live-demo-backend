@@ -23,6 +23,7 @@ from services import dataset_service
 
 app = FastAPI()
 
+# Auto-detect all imported training methods
 training_registry: Dict[str, training_method.TrainingMethod] = {
     method.id: method
     for method in [
