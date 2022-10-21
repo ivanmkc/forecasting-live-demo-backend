@@ -43,12 +43,7 @@ class ForecastJobService:
         Returns:
             forecast_job_result.ForecastJobResult: The results containing the URIs for each step.
         """
-        training_method = self._training_registry.get(request.training_method_name)
-
-        if training_method is None:
-            raise ValueError(
-                f"Training method '{request.training_method_name}' is not supported"
-            )
+        training_method = self._training_registry.get(request.training_method_id)
 
         # Start training
         output = completed_forecast_job.CompletedForecastJob(
@@ -59,6 +54,11 @@ class ForecastJobService:
         )
 
         try:
+            if training_method is None:
+                raise ValueError(
+                    f"Training method '{request.training_method_id}' is not supported"
+                )
+
             # Train model
             output.model_uri = training_method.train(
                 dataset=request.dataset,

@@ -82,15 +82,19 @@ def preview_dataset(dataset_id: str):
 @app.get("/forecast-job/{job_id}")
 def get_forecast_job(job_id: str):
     completed_job = training_jobs_manager_instance.get_completed_job(job_id=job_id)
-    pending_job_request = training_jobs_manager_instance.get_request(job_id=job_id)
 
     if completed_job is not None:
         return completed_job.as_response()
     else:
-        return {
-            "jobId": pending_job_request.id,
-            "request": pending_job_request.as_response(),
-        }
+        pending_job_request = training_jobs_manager_instance.get_request(job_id=job_id)
+
+        if pending_job_request:
+            return {
+                "jobId": pending_job_request.id,
+                "request": pending_job_request.as_response(),
+            }
+        else:
+            return HTTPException(status_code=404, detail=f"Job not found: {job_id}")
 
 
 @app.get("/jobs")
@@ -147,7 +151,8 @@ def submitForecastJob(
         job_id = training_jobs_manager_instance.enqueue_job(
             forecast_job_request.ForecastJobRequest(
                 start_time=datetime.datetime.now(datetime.timezone.utc),
-                training_method_name=training_method.display_name,
+                training_method_id=training_method.id,
+                training_method_display_name=training_method.display_name,
                 dataset=dataset,
                 model_parameters=request.modelParameters or {},
                 prediction_parameters=request.predictionParameters or {},

@@ -10,8 +10,11 @@ from models import dataset
 class ForecastJobRequest:
     """An encapsulation of the training job request"""
 
-    # The unique key associated with a training method.
-    training_method_name: str
+    # The unique key associated with the training method.
+    training_method_id: str
+
+    # The display name of with the training method.
+    training_method_display_name: str
 
     # The dataset used for model training.
     dataset: dataset.Dataset
@@ -31,7 +34,8 @@ class ForecastJobRequest:
     def as_response(self) -> Dict:
         return {
             "jobId": self.id,
-            "trainingMethodName": self.training_method_name,
+            "trainingMethodId": self.training_method_id,
+            "trainingMethodName": self.training_method_display_name,
             "dataset": {
                 "id": self.dataset.id,
                 "icon": self.dataset.icon,
