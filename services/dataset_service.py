@@ -25,13 +25,6 @@ DATASETS = [
             }
         },
     ),
-    # dataset.CSVDataset(
-    #     "sample_data/201306-citibike-tripdata.csv",
-    #     display_name="NYC Bike Traffic",
-    #     time_column="starttime",
-    #     description="This dataset includes bike traffic data from CityBikes",
-    #     icon="directions_bike",
-    # ),
 ]
 
 
