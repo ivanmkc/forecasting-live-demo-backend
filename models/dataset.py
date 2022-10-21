@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from functools import cached_property
 from io import StringIO
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from google.cloud import bigquery
@@ -18,6 +18,8 @@ class Dataset(abc.ABC):
     display_name: str
     time_column: str
     icon: Optional[str]
+    recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]]
+    recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]]
 
     @property
     @abc.abstractmethod
@@ -64,6 +66,8 @@ class Dataset(abc.ABC):
             "endDate": self.end_date.strftime("%m/%d/%Y"),
             "columns": self.columns,
             "dfPreview": df_preview.to_dict("records"),
+            "recommendedModelParameters": self.recommended_model_parameters,
+            "recommendedPredictionParameters": self.recommended_prediction_parameters,
         }
 
     def get_bigquery_uri(
@@ -111,6 +115,8 @@ class CSVDataset(Dataset):
     time_column: str
     description: str
     icon: Optional[str] = None
+    recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]] = None
+    recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]] = None
     id: str = dataclasses.field(default_factory=utils.generate_uuid)
 
     @cached_property
@@ -129,6 +135,8 @@ class VertexAIDataset(Dataset):
     project: str
     region: str
     icon: Optional[str] = None
+    recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]] = None
+    recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]] = None
 
     @cached_property
     def df(self) -> pd.DataFrame:

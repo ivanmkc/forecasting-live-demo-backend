@@ -10,14 +10,28 @@ DATASETS = [
         time_column="date",
         description="This is sales data from a fictional sporting goods company with several stores across the city. It includes sales data for several products, grouped in several categories.",
         icon="storefront",
+        recommended_model_parameters={
+            "bqml_arimaplus": {
+                "targetColumn": "sales",
+                "timeColumn": "date",
+                "timeSeriesIdentifierColumn": "product_at_store",
+                "dataGranularityUnit": "day",
+                "dataGranularityCount": 1,
+            }
+        },
+        recommended_prediction_parameters={
+            "bqml_arimaplus": {
+                "forecastHorizon": 120,
+            }
+        },
     ),
-    dataset.CSVDataset(
-        "sample_data/201306-citibike-tripdata.csv",
-        display_name="NYC Bike Traffic",
-        time_column="starttime",
-        description="This dataset includes bike traffic data from CityBikes",
-        icon="directions_bike",
-    ),
+    # dataset.CSVDataset(
+    #     "sample_data/201306-citibike-tripdata.csv",
+    #     display_name="NYC Bike Traffic",
+    #     time_column="starttime",
+    #     description="This dataset includes bike traffic data from CityBikes",
+    #     icon="directions_bike",
+    # ),
 ]
 
 

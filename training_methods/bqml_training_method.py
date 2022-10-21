@@ -17,7 +17,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The id
         """
-        return "bqml"
+        return "bqml_arimaplus"
 
     @property
     def display_name(self) -> str:
