@@ -94,7 +94,7 @@ def get_forecast_job(job_id: str):
                 "request": pending_job_request.as_response(),
             }
         else:
-            return HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+            raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
 
 
 @app.get("/jobs")
