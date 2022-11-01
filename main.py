@@ -322,11 +322,28 @@ async def prediction(job_id: str, output_type: str):
                 for group, time_values_map in group_time_value_map.items()
             ]
 
+            historical_time_values = df_history[
+                job_request.model_parameters["timeColumn"]
+            ]
+            historyMinDate = (
+                historical_time_values.min().isoformat()
+                if len(historical_time_values) > 0
+                else None
+            )
             historyMaxDate = (
-                unique_times[-1].isoformat() if len(unique_times) > 0 else None
+                historical_time_values.max().isoformat()
+                if len(historical_time_values) > 0
+                else None
             )
 
-            return {"lines": lines, "historyMaxDate": historyMaxDate}
+            historicalBounds = None
+            if historyMinDate is not None and historyMaxDate is not None:
+                historicalBounds = {"min": historyMinDate, "max": historyMaxDate}
+
+            return {
+                "lines": lines,
+                "historicalBounds": historicalBounds,
+            }
         else:
             raise HTTPException(
                 status_code=400,
