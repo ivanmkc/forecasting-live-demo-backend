@@ -79,12 +79,18 @@ class DebugTrainingMethod(training_method.TrainingMethod):
 
         return "debug.evaluation"
 
-    def predict(self, model: str, parameters: Dict[str, Any]) -> str:
+    def predict(
+        self,
+        model: str,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Predict using a model and return the BigQuery URI to its prediction table.
 
         Args:
             model (str): Model to evaluate.
-            parameters (Dict[str, Any]): The prediction parameters.
+            model_parameters (Dict[str, Any]): The model training parameters.
+            prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The BigQuery prediction table URI.

@@ -6,6 +6,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import constants
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
     bqml_training_method,
@@ -230,14 +231,11 @@ def format_for_rechart(
 # Get prediction
 @app.get("/prediction/{job_id}/{output_type}")
 async def prediction(job_id: str, output_type: str):
+    job_request = training_jobs_manager_instance.get_request(job_id=job_id)
+
+    if job_request is None:
+        raise HTTPException(status_code=404, detail=f"Job request not found: {job_id}")
     try:
-        job_request = training_jobs_manager_instance.get_request(job_id=job_id)
-
-        if job_request is None:
-            raise HTTPException(
-                status_code=404, detail=f"Job request not found: {job_id}"
-            )
-
         df_history = job_request.dataset.df
         df_prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
     except Exception as exception:
@@ -245,6 +243,10 @@ async def prediction(job_id: str, output_type: str):
         raise HTTPException(
             status_code=400, detail=f"There was a problem getting prediction: {job_id}"
         )
+
+    group_column = constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN
+    time_column = constants.FORECAST_TIME_COLUMN
+    target_column = constants.FORECAST_TARGET_COLUMN
 
     if df_prediction is None:
         raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
@@ -258,9 +260,6 @@ async def prediction(job_id: str, output_type: str):
                 "rows": df_prediction.to_dict(orient="records"),
             }
         elif output_type == "chartjs":
-            group_column = "product_at_store"  # Figure out how to generalize this.
-            time_column = "forecast_timestamp"
-            target_column = "forecast_value"  # Figure out how to generalize this.
 
             prediction_grouped = df_prediction.groupby(group_column)
 
@@ -284,22 +283,14 @@ async def prediction(job_id: str, output_type: str):
                 "datasets": datasets,
             }
         elif output_type == "recharts":
-            group_column = "product_at_store"  # Figure out how to generalize this.
-            time_column = "forecast_timestamp"
-            target_column = "forecast_value"  # Figure out how to generalize this.
-
-            history_formatted, history_min_date, history_max_date = format_for_rechart(
+            history_formatted, _, history_max_date = format_for_rechart(
                 group_column=job_request.model_parameters["timeSeriesIdentifierColumn"],
                 time_column=job_request.model_parameters["timeColumn"],
                 target_column=job_request.model_parameters["targetColumn"],
                 data=df_history,
             )
 
-            (
-                predictions_formatted,
-                predictions_min_date,
-                predictions_max_date,
-            ) = format_for_rechart(
+            (predictions_formatted, _, _,) = format_for_rechart(
                 group_column=group_column,
                 time_column=time_column,
                 target_column=target_column,
@@ -309,12 +300,49 @@ async def prediction(job_id: str, output_type: str):
             return {
                 "groups": df_prediction[group_column].unique().tolist(),
                 "data": history_formatted + predictions_formatted,
-                # "history": history_formatted,
-                "historyMinDate": history_min_date,
-                "historyMaxDate": history_max_date,
-                # "predictions": predictions_formatted,
-                "predictionsMinDate": predictions_min_date,
-                "predictionsMaxDate": predictions_max_date,
+                "historyMaxDate": history_max_date,  # The date separating history and prediction
+            }
+        elif output_type == "plotly":
+            prediction_grouped = df_prediction.groupby(group_column)
+
+            group_time_value_map = {
+                k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
+                for k, v in prediction_grouped
+            }
+
+            unique_times = sorted(list(df_prediction[time_column].unique()))
+
+            lines = [
+                {
+                    "x": unique_times,
+                    "y": [time_values_map[time] for time in unique_times],
+                    "name": group,
+                    "mode": "lines",
+                }
+                for group, time_values_map in group_time_value_map.items()
+            ]
+
+            historical_time_values = df_history[
+                job_request.model_parameters["timeColumn"]
+            ]
+            historyMinDate = (
+                historical_time_values.min().isoformat()
+                if len(historical_time_values) > 0
+                else None
+            )
+            historyMaxDate = (
+                historical_time_values.max().isoformat()
+                if len(historical_time_values) > 0
+                else None
+            )
+
+            historicalBounds = None
+            if historyMinDate is not None and historyMaxDate is not None:
+                historicalBounds = {"min": historyMinDate, "max": historyMaxDate}
+
+            return {
+                "lines": lines,
+                "historicalBounds": historicalBounds,
             }
         else:
             raise HTTPException(
