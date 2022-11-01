@@ -231,14 +231,11 @@ def format_for_rechart(
 # Get prediction
 @app.get("/prediction/{job_id}/{output_type}")
 async def prediction(job_id: str, output_type: str):
+    job_request = training_jobs_manager_instance.get_request(job_id=job_id)
+
+    if job_request is None:
+        raise HTTPException(status_code=404, detail=f"Job request not found: {job_id}")
     try:
-        job_request = training_jobs_manager_instance.get_request(job_id=job_id)
-
-        if job_request is None:
-            raise HTTPException(
-                status_code=404, detail=f"Job request not found: {job_id}"
-            )
-
         df_history = job_request.dataset.df
         df_prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
     except Exception as exception:
@@ -306,17 +303,30 @@ async def prediction(job_id: str, output_type: str):
                 "historyMaxDate": history_max_date,  # The date separating history and prediction
             }
         elif output_type == "plotly":
-            [
+            prediction_grouped = df_prediction.groupby(group_column)
+
+            group_time_value_map = {
+                k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
+                for k, v in prediction_grouped
+            }
+
+            unique_times = sorted(list(df_prediction[time_column].unique()))
+
+            lines = [
                 {
-                    "x": [
-                        "2013-10-04 22:23:00",
-                        "2013-11-04 22:23:00",
-                        "2013-12-04 22:23:00",
-                    ],
-                    "y": [1, 3, 6],
-                    type: "scatter",
+                    "x": unique_times,
+                    "y": [time_values_map[time] for time in unique_times],
+                    "name": group,
+                    "mode": "lines",
                 }
+                for group, time_values_map in group_time_value_map.items()
             ]
+
+            historyMaxDate = (
+                unique_times[-1].isoformat() if len(unique_times) > 0 else None
+            )
+
+            return {"lines": lines, "historyMaxDate": historyMaxDate}
         else:
             raise HTTPException(
                 status_code=400,
