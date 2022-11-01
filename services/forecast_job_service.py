@@ -71,7 +71,9 @@ class ForecastJobService:
 
             # Run prediction
             output.prediction_uri = training_method.predict(
-                model=output.model_uri, parameters=request.prediction_parameters
+                model=output.model_uri,
+                model_parameters=request.model_parameters,
+                prediction_parameters=request.prediction_parameters,
             )
         except Exception as exception:
             output.error_message = str(exception)

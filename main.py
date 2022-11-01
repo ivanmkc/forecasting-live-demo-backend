@@ -6,6 +6,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import constants
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
     bqml_training_method,
@@ -246,6 +247,10 @@ async def prediction(job_id: str, output_type: str):
             status_code=400, detail=f"There was a problem getting prediction: {job_id}"
         )
 
+    group_column = constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN
+    time_column = constants.FORECAST_TIME_COLUMN
+    target_column = constants.FORECAST_TARGET_COLUMN
+
     if df_prediction is None:
         raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
     else:
@@ -258,9 +263,6 @@ async def prediction(job_id: str, output_type: str):
                 "rows": df_prediction.to_dict(orient="records"),
             }
         elif output_type == "chartjs":
-            group_column = "product_at_store"  # Figure out how to generalize this.
-            time_column = "forecast_timestamp"
-            target_column = "forecast_value"  # Figure out how to generalize this.
 
             prediction_grouped = df_prediction.groupby(group_column)
 
@@ -284,22 +286,14 @@ async def prediction(job_id: str, output_type: str):
                 "datasets": datasets,
             }
         elif output_type == "recharts":
-            group_column = "product_at_store"  # Figure out how to generalize this.
-            time_column = "forecast_timestamp"
-            target_column = "forecast_value"  # Figure out how to generalize this.
-
-            history_formatted, history_min_date, history_max_date = format_for_rechart(
+            history_formatted, _, history_max_date = format_for_rechart(
                 group_column=job_request.model_parameters["timeSeriesIdentifierColumn"],
                 time_column=job_request.model_parameters["timeColumn"],
                 target_column=job_request.model_parameters["targetColumn"],
                 data=df_history,
             )
 
-            (
-                predictions_formatted,
-                predictions_min_date,
-                predictions_max_date,
-            ) = format_for_rechart(
+            (predictions_formatted, _, _,) = format_for_rechart(
                 group_column=group_column,
                 time_column=time_column,
                 target_column=target_column,
@@ -309,13 +303,20 @@ async def prediction(job_id: str, output_type: str):
             return {
                 "groups": df_prediction[group_column].unique().tolist(),
                 "data": history_formatted + predictions_formatted,
-                # "history": history_formatted,
-                "historyMinDate": history_min_date,
-                "historyMaxDate": history_max_date,
-                # "predictions": predictions_formatted,
-                "predictionsMinDate": predictions_min_date,
-                "predictionsMaxDate": predictions_max_date,
+                "historyMaxDate": history_max_date,  # The date separating history and prediction
             }
+        elif output_type == "plotly":
+            [
+                {
+                    "x": [
+                        "2013-10-04 22:23:00",
+                        "2013-11-04 22:23:00",
+                        "2013-12-04 22:23:00",
+                    ],
+                    "y": [1, 3, 6],
+                    type: "scatter",
+                }
+            ]
         else:
             raise HTTPException(
                 status_code=400,
