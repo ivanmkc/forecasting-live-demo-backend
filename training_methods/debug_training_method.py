@@ -36,15 +36,15 @@ class DebugTrainingMethod(training_method.TrainingMethod):
         """
         return "Debug"
 
-    def dataset_group_column(
+    def dataset_time_series_identifier_column(
         self, job_request: forecast_job_request.ForecastJobRequest
     ) -> str:
-        """The column representing the group variable in the dataset dataframe.
+        """The column representing the time series identifier variable in the dataset dataframe.
 
         Returns:
             str: The column name
         """
-        return "group"
+        return "time_series_identifier"
 
     def dataset_time_column(
         self, job_request: forecast_job_request.ForecastJobRequest
@@ -64,7 +64,7 @@ class DebugTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The column name
         """
-        return "time"
+        return "target"
 
     def train(
         self,

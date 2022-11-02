@@ -6,11 +6,12 @@ WORKDIR app
 
 COPY requirements.txt .
 COPY main.py .
+COPY utils.py .
+COPY constants.py .
 COPY models models
 COPY sample_data sample_data
 COPY services services
 COPY training_methods training_methods
-COPY utils.py .
 
 # Install dependencies.
 RUN pip install --upgrade pip

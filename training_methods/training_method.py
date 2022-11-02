@@ -26,10 +26,10 @@ class TrainingMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def dataset_group_column(
+    def dataset_time_series_identifier_column(
         self, job_request: forecast_job_request.ForecastJobRequest
     ) -> str:
-        """The column representing the group variable in the dataset dataframe.
+        """The column representing the time series identifier variable in the dataset dataframe.
 
         Returns:
             str: The column name

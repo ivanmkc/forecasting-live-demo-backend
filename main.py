@@ -194,9 +194,12 @@ async def evaluation(job_id: str):
 
 
 def format_for_plotly(
-    group_column: str, time_column: str, target_column: str, data: pd.DataFrame
+    time_series_identifier_column: str,
+    time_column: str,
+    target_column: str,
+    data: pd.DataFrame,
 ) -> List[Dict[str, Any]]:
-    data_grouped = data.groupby(group_column)
+    data_grouped = data.groupby(time_series_identifier_column)
 
     group_time_value_map = {
         k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
@@ -217,12 +220,15 @@ def format_for_plotly(
 
 
 def format_for_rechart(
-    group_column: str, time_column: str, target_column: str, data: pd.DataFrame
+    time_series_identifier_column: str,
+    time_column: str,
+    target_column: str,
+    data: pd.DataFrame,
 ) -> Tuple[
     List[Dict[str, Any]], Optional[datetime.datetime], Optional[datetime.datetime]
 ]:
 
-    data_grouped = data.groupby(group_column)
+    data_grouped = data.groupby(time_series_identifier_column)
 
     # Create a map of group to map of time-to-values
     # i.e. group_time_value_map[group_id][time_id] = target_value
@@ -278,13 +284,15 @@ async def prediction(job_id: str, output_type: str):
         )
 
     # Format historical dataframe to match prediction dataframes, according to training method
-    history_group_column = training_method.dataset_group_column(job_request=job_request)
+    history_time_series_identifier_column = (
+        training_method.dataset_time_series_identifier_column(job_request=job_request)
+    )
     history_time_column = training_method.dataset_time_column(job_request=job_request)
     history_target_column = training_method.dataset_target_column(
         job_request=job_request
     )
 
-    group_column = constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN
+    time_series_identifier_column = constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN
     time_column = constants.FORECAST_TIME_COLUMN
     target_column = constants.FORECAST_TARGET_COLUMN
 
@@ -301,7 +309,7 @@ async def prediction(job_id: str, output_type: str):
             }
         elif output_type == "chartjs":
 
-            prediction_grouped = df_prediction.groupby(group_column)
+            prediction_grouped = df_prediction.groupby(time_series_identifier_column)
 
             group_time_value_map = {
                 k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
@@ -324,21 +332,23 @@ async def prediction(job_id: str, output_type: str):
             }
         elif output_type == "recharts":
             history_formatted, _, history_max_date = format_for_rechart(
-                group_column=history_group_column,
+                time_series_identifier_column=history_time_series_identifier_column,
                 time_column=history_time_column,
                 target_column=history_target_column,
                 data=df_history,
             )
 
             (predictions_formatted, _, _,) = format_for_rechart(
-                group_column=group_column,
+                time_series_identifier_column=time_series_identifier_column,
                 time_column=time_column,
                 target_column=target_column,
                 data=df_prediction,
             )
 
             return {
-                "groups": df_prediction[group_column].unique().tolist(),
+                "groups": df_prediction[time_series_identifier_column]
+                .unique()
+                .tolist(),
                 "data": history_formatted + predictions_formatted,
                 "historyMaxDate": history_max_date,  # The date separating history and prediction
             }
@@ -346,7 +356,7 @@ async def prediction(job_id: str, output_type: str):
             column_map = {
                 job_request.model_parameters[
                     "timeSeriesIdentifierColumn"
-                ]: group_column,
+                ]: time_series_identifier_column,
                 job_request.model_parameters["timeColumn"]: time_column,
                 job_request.model_parameters["targetColumn"]: target_column,
             }
@@ -373,7 +383,7 @@ async def prediction(job_id: str, output_type: str):
             df_prediction = df_prediction.filter(column_map.values())
 
             lines = format_for_plotly(
-                group_column=group_column,
+                time_series_identifier_column=time_series_identifier_column,
                 time_column=time_column,
                 target_column=target_column,
                 data=pd.concat([df_history, df_prediction]),
