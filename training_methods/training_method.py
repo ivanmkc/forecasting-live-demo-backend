@@ -1,7 +1,7 @@
 import abc
 from typing import Any, Dict
 
-from models import dataset
+from models import dataset, forecast_job_request
 
 
 class TrainingMethod(abc.ABC):
@@ -22,6 +22,39 @@ class TrainingMethod(abc.ABC):
 
         Returns:
             str: The name
+        """
+        pass
+
+    @abc.abstractmethod
+    def dataset_group_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the group variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        pass
+
+    @abc.abstractmethod
+    def dataset_time_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the time variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        pass
+
+    @abc.abstractmethod
+    def dataset_target_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the target variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
         """
         pass
 

@@ -1,11 +1,10 @@
-from asyncio import constants
 from typing import Any, Dict
 
 from google.cloud import bigquery
 
 import constants
 import utils
-from models import dataset
+from models import dataset, forecast_job_request
 from training_methods import training_method
 
 
@@ -29,6 +28,36 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             str: The name
         """
         return "BQML ARIMA+"
+
+    def dataset_group_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the group variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return job_request.model_parameters["timeSeriesIdentifierColumn"]
+
+    def dataset_time_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the time variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return job_request.model_parameters["timeColumn"]
+
+    def dataset_target_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the target variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return job_request.model_parameters["targetColumn"]
 
     def train(
         self,
@@ -60,6 +89,9 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
 
         if time_series_id_column is None:
             raise ValueError(f"Missing argument: timeSeriesIdentifierColumn")
+
+        if forecast_horizon is None:
+            raise ValueError(f"Missing argument: forecast_horizon")
 
         # Start training
         query_job = self._train(

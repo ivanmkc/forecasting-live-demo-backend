@@ -124,7 +124,7 @@ class SubmitForecastJobAPIRequest(BaseModel):
         prediction_parameters (Dict[str, Any]): Parameters for training.
     """
 
-    trainingMethodName: str
+    trainingMethodId: str
     datasetId: str
     modelParameters: Optional[Dict[str, Any]] = None
     predictionParameters: Optional[Dict[str, Any]] = None
@@ -135,7 +135,7 @@ def submitForecastJob(
     request: SubmitForecastJobAPIRequest,
 ):
     dataset = dataset_service.get_dataset(dataset_id=request.datasetId)
-    training_method = training_registry.get(request.trainingMethodName)
+    training_method = training_registry.get(request.trainingMethodId)
 
     if dataset is None:
         raise HTTPException(
@@ -145,7 +145,7 @@ def submitForecastJob(
     if training_method is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Training method not found: {request.trainingMethodName}",
+            detail=f"Training method not found: {request.trainingMethodId}",
         )
 
     try:
@@ -195,9 +195,7 @@ async def evaluation(job_id: str):
 
 def format_for_plotly(
     group_column: str, time_column: str, target_column: str, data: pd.DataFrame
-) -> Tuple[
-    List[Dict[str, Any]], Optional[datetime.datetime], Optional[datetime.datetime]
-]:
+) -> List[Dict[str, Any]]:
     data_grouped = data.groupby(group_column)
 
     group_time_value_map = {
@@ -260,6 +258,8 @@ async def prediction(job_id: str, output_type: str):
 
     if job_request is None:
         raise HTTPException(status_code=404, detail=f"Job request not found: {job_id}")
+
+    # Fetch dataframes
     try:
         df_history = job_request.dataset.df
         df_prediction = training_jobs_manager_instance.get_prediction(job_id=job_id)
@@ -268,6 +268,21 @@ async def prediction(job_id: str, output_type: str):
         raise HTTPException(
             status_code=400, detail=f"There was a problem getting prediction: {job_id}"
         )
+
+    # Fetch training methods
+    training_method = training_registry.get(job_request.training_method_id)
+    if training_method is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Training method not found: {job_request.training_method_id}",
+        )
+
+    # Format historical dataframe to match prediction dataframes, according to training method
+    history_group_column = training_method.dataset_group_column(job_request=job_request)
+    history_time_column = training_method.dataset_time_column(job_request=job_request)
+    history_target_column = training_method.dataset_target_column(
+        job_request=job_request
+    )
 
     group_column = constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN
     time_column = constants.FORECAST_TIME_COLUMN
@@ -309,9 +324,9 @@ async def prediction(job_id: str, output_type: str):
             }
         elif output_type == "recharts":
             history_formatted, _, history_max_date = format_for_rechart(
-                group_column=job_request.model_parameters["timeSeriesIdentifierColumn"],
-                time_column=job_request.model_parameters["timeColumn"],
-                target_column=job_request.model_parameters["targetColumn"],
+                group_column=history_group_column,
+                time_column=history_time_column,
+                target_column=history_target_column,
                 data=df_history,
             )
 
