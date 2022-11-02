@@ -7,6 +7,11 @@ import utils
 from models import dataset, forecast_job_request
 from training_methods import training_method
 
+TIME_COLUMN_PARAMETER = "timeColumn"
+TARGET_COLUMN_PARAMETER = "targetColumn"
+TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER = "timeSeriesIdentifierColumn"
+FORECAST_HORIZON_PARAMETER = "forecastHorizon"
+
 
 class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
     """Used to run a BQML ARIMAPlus training job"""
@@ -37,7 +42,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The column name
         """
-        return job_request.model_parameters["timeSeriesIdentifierColumn"]
+        return job_request.model_parameters[TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER]
 
     def dataset_time_column(
         self, job_request: forecast_job_request.ForecastJobRequest
@@ -47,7 +52,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The column name
         """
-        return job_request.model_parameters["timeColumn"]
+        return job_request.model_parameters[TIME_COLUMN_PARAMETER]
 
     def dataset_target_column(
         self, job_request: forecast_job_request.ForecastJobRequest
@@ -57,7 +62,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The column name
         """
-        return job_request.model_parameters["targetColumn"]
+        return job_request.model_parameters[TARGET_COLUMN_PARAMETER]
 
     def train(
         self,
@@ -76,19 +81,23 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             str: The model URI
         """
 
-        time_column = model_parameters.get("timeColumn")
-        target_column = model_parameters.get("targetColumn")
-        time_series_id_column = model_parameters.get("timeSeriesIdentifierColumn")
-        forecast_horizon = prediction_parameters.get("forecastHorizon")
+        time_column = model_parameters.get(TIME_COLUMN_PARAMETER)
+        target_column = model_parameters.get(TARGET_COLUMN_PARAMETER)
+        time_series_id_column = model_parameters.get(
+            TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER
+        )
+        forecast_horizon = prediction_parameters.get(FORECAST_HORIZON_PARAMETER)
 
         if time_column is None:
-            raise ValueError(f"Missing argument: timeColumn")
+            raise ValueError(f"Missing argument: {TIME_COLUMN_PARAMETER}")
 
         if target_column is None:
-            raise ValueError(f"Missing argument: targetColumn")
+            raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
 
         if time_series_id_column is None:
-            raise ValueError(f"Missing argument: timeSeriesIdentifierColumn")
+            raise ValueError(
+                f"Missing argument: {TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER}"
+            )
 
         if forecast_horizon is None:
             raise ValueError(f"Missing argument: forecast_horizon")
@@ -211,11 +220,13 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
     ) -> bigquery.QueryJob:
-        time_series_id_column = model_parameters.get("timeSeriesIdentifierColumn")
-        forecast_horizon = prediction_parameters.get("forecastHorizon")
+        time_series_id_column = model_parameters.get(
+            TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER
+        )
+        forecast_horizon = prediction_parameters.get(FORECAST_HORIZON_PARAMETER)
 
         if forecast_horizon is None:
-            raise ValueError("forecastHorizon was not provided")
+            raise ValueError("{FORECAST_HORIZON_PARAMETER} was not provided")
 
         client = bigquery.Client()
 
