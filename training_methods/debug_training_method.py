@@ -5,7 +5,7 @@ from google.cloud import bigquery
 import time
 
 import utils
-from models import dataset
+from models import dataset, forecast_job_request
 from training_methods import training_method
 
 MAX_DELAY_IN_SECONDS = 60
@@ -36,6 +36,36 @@ class DebugTrainingMethod(training_method.TrainingMethod):
         """
         return "Debug"
 
+    def dataset_time_series_identifier_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the time series identifier variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return "time_series_identifier"
+
+    def dataset_time_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the time variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return "time"
+
+    def dataset_target_column(
+        self, job_request: forecast_job_request.ForecastJobRequest
+    ) -> str:
+        """The column representing the target variable in the dataset dataframe.
+
+        Returns:
+            str: The column name
+        """
+        return "target"
+
     def train(
         self,
         dataset: dataset.Dataset,
@@ -55,12 +85,12 @@ class DebugTrainingMethod(training_method.TrainingMethod):
 
         # Sleep for a specified delay, not more than a max.
         delay_in_seconds = min(
-            model_parameters.get("delay_in_seconds", 5), MAX_DELAY_IN_SECONDS
+            model_parameters.get("delayInSeconds", 5), MAX_DELAY_IN_SECONDS
         )
 
         time.sleep(delay_in_seconds)
 
-        error_message = model_parameters.get("error_message")
+        error_message = model_parameters.get("errorMessage")
 
         if error_message:
             raise ValueError(error_message)
