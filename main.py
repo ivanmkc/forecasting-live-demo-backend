@@ -193,6 +193,31 @@ async def evaluation(job_id: str):
         return output
 
 
+def format_for_plotly(
+    group_column: str, time_column: str, target_column: str, data: pd.DataFrame
+) -> Tuple[
+    List[Dict[str, Any]], Optional[datetime.datetime], Optional[datetime.datetime]
+]:
+    data_grouped = data.groupby(group_column)
+
+    group_time_value_map = {
+        k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
+        for k, v in data_grouped
+    }
+
+    unique_times = sorted(list(data[time_column].unique()))
+
+    return [
+        {
+            "x": unique_times,
+            "y": [time_values_map[time] for time in unique_times],
+            "name": group,
+            "mode": "lines",
+        }
+        for group, time_values_map in group_time_value_map.items()
+    ]
+
+
 def format_for_rechart(
     group_column: str, time_column: str, target_column: str, data: pd.DataFrame
 ) -> Tuple[
@@ -303,42 +328,41 @@ async def prediction(job_id: str, output_type: str):
                 "historyMaxDate": history_max_date,  # The date separating history and prediction
             }
         elif output_type == "plotly":
-            prediction_grouped = df_prediction.groupby(group_column)
-
-            group_time_value_map = {
-                k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
-                for k, v in prediction_grouped
+            column_map = {
+                job_request.model_parameters[
+                    "timeSeriesIdentifierColumn"
+                ]: group_column,
+                job_request.model_parameters["timeColumn"]: time_column,
+                job_request.model_parameters["targetColumn"]: target_column,
             }
 
-            unique_times = sorted(list(df_prediction[time_column].unique()))
+            df_history = df_history.rename(columns=column_map)
 
-            lines = [
-                {
-                    "x": unique_times,
-                    "y": [time_values_map[time] for time in unique_times],
-                    "name": group,
-                    "mode": "lines",
-                }
-                for group, time_values_map in group_time_value_map.items()
-            ]
-
-            historical_time_values = df_history[
-                job_request.model_parameters["timeColumn"]
-            ]
-            historyMinDate = (
+            historical_time_values = df_history[time_column]
+            history_min_date = (
                 historical_time_values.min().isoformat()
                 if len(historical_time_values) > 0
                 else None
             )
-            historyMaxDate = (
+            history_max_date = (
                 historical_time_values.max().isoformat()
                 if len(historical_time_values) > 0
                 else None
             )
 
             historicalBounds = None
-            if historyMinDate is not None and historyMaxDate is not None:
-                historicalBounds = {"min": historyMinDate, "max": historyMaxDate}
+            if history_min_date is not None and history_max_date is not None:
+                historicalBounds = {"min": history_min_date, "max": history_max_date}
+
+            df_history = df_history.filter(column_map.values())
+            df_prediction = df_prediction.filter(column_map.values())
+
+            lines = format_for_plotly(
+                group_column=group_column,
+                time_column=time_column,
+                target_column=target_column,
+                data=pd.concat([df_history, df_prediction]),
+            )
 
             return {
                 "lines": lines,
