@@ -10,6 +10,7 @@ from training_methods import training_method
 TIME_COLUMN_PARAMETER = "timeColumn"
 TARGET_COLUMN_PARAMETER = "targetColumn"
 TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER = "timeSeriesIdentifierColumn"
+DATA_FREQUENCY_COLUMN_PARAMETER = "dataFrequency"
 FORECAST_HORIZON_PARAMETER = "forecastHorizon"
 
 
@@ -86,6 +87,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         time_series_id_column = model_parameters.get(
             TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER
         )
+        dataFrequency = model_parameters.get(DATA_FREQUENCY_COLUMN_PARAMETER)
         forecast_horizon = prediction_parameters.get(FORECAST_HORIZON_PARAMETER)
 
         if time_column is None:
@@ -99,6 +101,9 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
                 f"Missing argument: {TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER}"
             )
 
+        if dataFrequency is None:
+            raise ValueError(f"Missing argument: {DATA_FREQUENCY_COLUMN_PARAMETER}")
+
         if forecast_horizon is None:
             raise ValueError(f"Missing argument: forecast_horizon")
 
@@ -108,6 +113,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             time_column=time_column,
             target_column=target_column,
             time_series_id_column=time_series_id_column,
+            dataFrequency=dataFrequency,
             forecast_horizon=forecast_horizon,
         )
 
@@ -166,6 +172,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         time_column: str,
         target_column: str,
         time_series_id_column: str,
+        dataFrequency: str,
         forecast_horizon: int,
     ) -> bigquery.QueryJob:
         client = bigquery.Client()
@@ -185,6 +192,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             TIME_SERIES_TIMESTAMP_COL = '{time_column}',
             TIME_SERIES_DATA_COL = '{target_column}',
             TIME_SERIES_ID_COL = '{time_series_id_column}',
+            DATA_FREQUENCY = '{dataFrequency}',
             HORIZON = {forecast_horizon}
             ) AS
             SELECT
