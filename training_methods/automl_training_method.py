@@ -2,6 +2,7 @@ from tokenize import Double
 from typing import Any, Dict, List, Optional, ParamSpec
 from uuid import UUID
 import pandas as pd
+import numpy as np
 
 from google.cloud import aiplatform, bigquery
 from google.cloud.aiplatform import models
@@ -13,16 +14,30 @@ from training_methods import training_method
 aiplatform.init()
 
 class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
-    @staticmethod
-    def training_method() -> str:
-        """A unique key representing this training method.
+    @property
+    def id(self) -> str:
+        """A unique id representing this training method.
 
         Returns:
-            str: The key
+            str: The id
         """
         return "automl"
 
-    def train(self, dataset: dataset.Dataset, parameters: Dict[str, Any]) -> str:
+    @property
+    def display_name(self) -> str:
+        """A display_name representing this training method.
+
+        Returns:
+            str: The name
+        """
+        return "Vertex AI AutoML Forecasting"
+
+    def train(
+      self,
+      dataset: dataset.Dataset,
+      model_parameters: Dict[str, Any],
+      prediction_parameters: Dict[str, Any]
+      ) -> str:
         """Train a job and return the model URI.
 
         Args:
@@ -32,16 +47,17 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The model resource name
         """
-        # create dataset here
-        time_column = parameters.get("time_column")
-        target_column = parameters.get("target_column")
-        time_series_id_column = parameters.get("time_series_id_column")
-        forecast_horizon = parameters.get("forecast_horizon")
-        data_granularity_unit = parameters.get("data_granularity_unit")
-        data_granularity_count = parameters.get("data_granularity_count")
-        optimization_objective = parameters.get("optimization_objective")
-        column_specs = parameters.get("column_specs")
-        time_series_attribute_columns = parameters.get("time_series_attribute_columns")
+
+        time_column = model_parameters.get("time_column")
+        target_column = model_parameters.get("target_column")
+        time_series_id_column = model_parameters.get("time_series_id_column")
+        data_granularity_unit = model_parameters.get("data_granularity_unit")
+        data_granularity_count = model_parameters.get("data_granularity_count")
+        optimization_objective = model_parameters.get("optimization_objective")
+        column_specs = model_parameters.get("column_specs")
+        time_series_attribute_columns = model_parameters.get("time_series_attribute_columns")
+
+        forecast_horizon = prediction_parameters.get("forecast_horizon")
 
         if time_column is None:
             raise ValueError(f"Missing argument: time_column")
@@ -91,7 +107,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         return table_uri
 
-    def predict(self, model: str, parameters: Dict[str, Any]) -> str:
+    def predict(self, model: str, prediction_parameters: Dict[str, Any]) -> str:
         """Predict using a model and return the BigQuery URI to its prediction table.
 
         Args:
@@ -101,14 +117,28 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         Returns:
             str: The BigQuery prediction table URI.
         """
-        bigquery_source = parameters.get("bigquery_source")
+        forecast_horizon = prediction_parameters.get("forecast_horizon")
+        context_window = prediction_parameters.get("context_window")
+        bigquery_source = prediction_parameters.get("bigquery_source")
+
+        if forecast_horizon is None:
+            raise ValueError(f"Missing argument: forecast_horizon")
 
         if bigquery_source is None:
-          raise ValueError("Missing argument: bigquery_source")
+            raise ValueError(f"Missing argument: bigquery_source")
+
+        if context_window is None:
+            raise ValueError(f"Missing argument: context_window")
+
+        processed_dataset_bq_source = self._prepare_test_dataset(
+          context_window=context_window,
+          forecast_horizon=forecast_horizon,
+          bigquery_source=bigquery_source
+          )
 
         job = self._predict(
-          model=model,
-          bigquery_source=bigquery_source
+          model_name=model,
+          bigquery_source=processed_dataset_bq_source
         )
 
         output_dataset = job.output_info.bigquery_output_dataset
@@ -133,6 +163,13 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         uuid = utils.generate_uuid()
 
+        # Create Vertex AI time series dataset
+        timeseries_dataset = aiplatform.TimeSeriesDataset.create(
+          display_name=f"sales_forecasting_train_{uuid}",
+          bq_source=f"bq://{dataset.get_bigquery_uri(time_column=time_column)}"
+          )
+
+
         training_job = aiplatform.AutoMLForecastingTrainingJob(
           display_name=f"automl-job-{uuid}",
           optimization_objective=optimization_objective,
@@ -141,7 +178,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         # Start running the training pipeline
         model = training_job.run(
-          dataset=dataset,
+          dataset=timeseries_dataset,
           target_column=target_column,
           time_column=time_column,
           time_series_identifier_column=time_series_id_column,
@@ -211,14 +248,14 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
     def _predict(
       self,
-      model: str,
+      model_name: str,
       bigquery_source: str
     ) -> aiplatform.BatchPredictionJob:
 
         client = bigquery.Client()
         project_id = client.project
 
-        model = aiplatform.Model(model_name=model)
+        model = aiplatform.Model(model_name=model_name)
 
         batch_prediction_job = model.batch_predict(
           job_display_name=f"automl_forecasting_{utils.generate_uuid()}",
@@ -232,4 +269,59 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         return batch_prediction_job
 
+    def _prepare_test_dataset(
+      self,
+      context_window: int,
+      forecast_horizon: int,
+      bigquery_source: str
+      ) -> str:
+      """This function does the prerocessing job on the test data and
+      saves the result in a bigquery table
 
+      Args:
+          context_window (int): Sets how far back the model looks during training
+            (and for forecasts).
+          forecast_horizon (int): Determines how far into the future the model
+            forecasts the target value for each row of prediction data.
+          bigquery_source (str): BigQuery uri of the table to be processed in
+            format bq://project-id.dataset-id.table-id
+
+      Returns:
+          str: BigQuery uri of the destination table where the preprocess data is
+            saved to in format bq://project-id.dataset-id.table-id
+      """
+
+      # Download dataset from BigQuery
+      df_test = utils.download_bq_table(bq_table_uri=bigquery_source)
+      df_test.sort_values(by="date_index", inplace=True)
+      df_test["date"] = pd.to_datetime(df_test["date"]).dt.normalize()
+      start_date = df_test.iloc[0]["date"]
+
+      # Store start and end dates for context and horizon
+      date_context_window_start = start_date
+      date_context_window_end = start_date + np.timedelta64(context_window, "D")
+      time_horizon_end = date_context_window_end + np.timedelta64(forecast_horizon, "D")
+
+      # Extract dataframes for context and horizon
+      df_test_context = df_test[
+          (df_test["date"] >= date_context_window_start)
+          & (df_test["date"] < date_context_window_end)
+      ]
+      df_test_horizon = df_test[
+          (df_test["date"] >= date_context_window_end) & (df_test["date"] < time_horizon_end)
+      ].copy()
+
+      # Remove sales for horizon (i.e. future dates)
+      df_test_horizon["sales"] = None
+
+      # Write test data to CSV
+      df_test = pd.concat([df_test_context, df_test_horizon])
+
+      # Load the data to bigquery
+      destination_table = utils.save_dataframe_to_bigquery(
+        dataframe=df_test,
+        table_name="processed-test-data"
+      )
+      bq_uri = f"bq://{destination_table}"
+      
+      return bq_uri

@@ -6,3 +6,5 @@ prophet
 google-cloud-bigquery[pandas]
 google-cloud-aiplatform
 pyarrow
+numpy
+pandas-gbq

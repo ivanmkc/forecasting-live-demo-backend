@@ -1,10 +1,13 @@
 import abc
 import datetime
 from typing import Any, Dict
+import logging
 
 from models import completed_forecast_job, dataset
 from models.forecast_job_request import ForecastJobRequest
 from training_methods import training_method
+
+logger = logging.getLogger(__name__)
 
 
 class ForecastJobService:
@@ -76,6 +79,7 @@ class ForecastJobService:
                 prediction_parameters=request.prediction_parameters,
             )
         except Exception as exception:
+            logger.error(str(exception))
             output.error_message = str(exception)
         finally:
             output.end_time = datetime.datetime.now(datetime.timezone.utc)

@@ -10,6 +10,7 @@ import constants
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
     bqml_training_method,
+    automl_training_method,
     debug_training_method,
     training_method,
 )
