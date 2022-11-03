@@ -90,11 +90,17 @@ class TrainingMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def predict(self, model: str, prediction_parameters: Dict[str, Any]) -> str:
+    def predict(
+        self,
+        model: str,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Predict using a model and return the BigQuery URI to its prediction table.
 
         Args:
             model (str): Model to evaluate.
+            model_parameters (Dict[str, Any]): The model training parameters.
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
