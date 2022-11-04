@@ -5,6 +5,7 @@ import pandas as pd
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 import constants
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
@@ -49,6 +50,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.get("/datasets")
@@ -275,7 +277,7 @@ async def prediction(job_id: str, output_type: str):
     job_request = training_jobs_manager_instance.get_request(job_id=job_id)
 
     if job_request is None:
-        raise HTTPException(status_code=404, detail=f"Job request not found: {job_id}")
+        raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
 
     # Fetch dataframes
     try:

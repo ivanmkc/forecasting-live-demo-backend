@@ -123,7 +123,7 @@ class CSVDataset(Dataset):
     def df(self) -> pd.DataFrame:
         df = pd.read_csv(self.filepath_or_buffer)
         df[self.time_column] = pd.to_datetime(df[self.time_column], utc=True)
-        return df
+        return df.sort_values(self.time_column)
 
 
 @dataclasses.dataclass

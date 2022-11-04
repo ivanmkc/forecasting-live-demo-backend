@@ -6,7 +6,7 @@ from models import dataset
 DATASETS = [
     dataset.CSVDataset(
         "sample_data/sales_forecasting_train.csv",
-        display_name="Retail Sales",
+        display_name="Sport store sales (synthetic)",
         time_column="date",
         description="This is sales data from a fictional sporting goods company with several stores across the city. It includes sales data for several products, grouped in several categories.",
         icon="storefront",
@@ -25,10 +25,30 @@ DATASETS = [
         },
     ),
     dataset.CSVDataset(
+        "sample_data/iowa_liquor_sales.csv",
+        display_name="Iowa Liquor Sales",
+        time_column="date",
+        description="This dataset contains the spirits purchase information of Iowa Class “E” liquor licensees by product and date of purchase. This dataset was simplified for demonstration purposes.",
+        icon="liquor",
+        recommended_model_parameters={
+            "bqml_arimaplus": {
+                "targetColumn": "sale_dollars",
+                "timeColumn": "date",
+                "timeSeriesIdentifierColumn": "county_and_city",
+                "dataFrequency": "daily",
+            }
+        },
+        recommended_prediction_parameters={
+            "bqml_arimaplus": {
+                "forecastHorizon": 120,
+            }
+        },
+    ),
+    dataset.CSVDataset(
         "sample_data/cloud_spend.csv",
         display_name="Cloud Spend",
         time_column="date",
-        description="This is cloud spend data.",
+        description="This is exported Cloud Billing dataset from a sample GCP analytics use case project.",
         icon="cloud",
         recommended_model_parameters={
             "bqml_arimaplus": {
