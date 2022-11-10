@@ -79,13 +79,14 @@ class TrainingMethod(abc.ABC):
 
     @abc.abstractmethod
     def evaluate(self, model: str) -> str:
-        """Evaluate a model and return the BigQuery URI to its evaluation table.
+        """Evaluate a model and return the BigQuery table ID to its evaluation
+        table.
 
         Args:
             model (str): Model to evaluate.
 
         Returns:
-            str: The BigQuery evaluation table URI.
+            str: The BigQuery evaluation table ID.
         """
         pass
 
@@ -96,7 +97,8 @@ class TrainingMethod(abc.ABC):
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
     ) -> str:
-        """Predict using a model and return the BigQuery URI to its prediction table.
+        """Predict using a model and return the BigQuery table ID to its
+        prediction table.
 
         Args:
             model (str): Model to evaluate.
@@ -104,6 +106,6 @@ class TrainingMethod(abc.ABC):
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
-            str: The BigQuery prediction table URI.
+            str: The BigQuery prediction table ID.
         """
         pass

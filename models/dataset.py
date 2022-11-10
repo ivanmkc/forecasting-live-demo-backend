@@ -20,6 +20,7 @@ class Dataset(abc.ABC):
     icon: Optional[str]
     recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]]
     recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]]
+    test_percentage: int=0.2
 
     @property
     @abc.abstractmethod
@@ -73,39 +74,50 @@ class Dataset(abc.ABC):
     def get_bigquery_uri(
         self,
         time_column: str,
+        dataset_portion: str
     ) -> str:
-        dataset_id = utils.generate_uuid()
-        table_id = utils.generate_uuid()
+      """_summary_
 
-        # Write dataset to BigQuery table
-        client = bigquery.Client()
-        project_id = client.project
+      Args:
+          time_column (str): _description_
+          dataset_portion (str): `test` or `train`
 
-        bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
-        bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
+      Returns:
+          str: _description_
+      """
 
-        job_config = bigquery.LoadJobConfig(
-            # Specify a (partial) schema. All columns are always written to the
-            # table. The schema is used to assist in data type definitions.
-            schema=[
-                bigquery.SchemaField(time_column, bigquery.enums.SqlTypeNames.DATE),
-            ],
-            # Optionally, set the write disposition. BigQuery appends loaded rows
-            # to an existing table by default, but with WRITE_TRUNCATE write
-            # disposition it replaces the table with the loaded data.
-            write_disposition="WRITE_TRUNCATE",
-        )
+      dataset_id = utils.generate_uuid()
+      table_id = utils.generate_uuid()
 
-        # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
-        job = client.load_table_from_dataframe(
-            dataframe=self.df,
-            destination=f"{project_id}.{dataset_id}.{table_id}",
-            job_config=job_config,
-        )  # Make an API request.
+      # Write dataset to BigQuery table
+      client = bigquery.Client()
+      project_id = client.project
 
-        _ = job.result()  # Wait for the job to complete.
+      bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
+      bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
 
-        return str(job.destination)
+      job_config = bigquery.LoadJobConfig(
+          # Specify a (partial) schema. All columns are always written to the
+          # table. The schema is used to assist in data type definitions.
+          schema=[
+              bigquery.SchemaField(time_column, bigquery.enums.SqlTypeNames.DATE),
+          ],
+          # Optionally, set the write disposition. BigQuery appends loaded rows
+          # to an existing table by default, but with WRITE_TRUNCATE write
+          # disposition it replaces the table with the loaded data.
+          write_disposition="WRITE_TRUNCATE",
+      )
+
+      # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
+      job = client.load_table_from_dataframe(
+          dataframe=self.df,
+          destination=f"{project_id}.{dataset_id}.{table_id}",
+          job_config=job_config,
+      )  # Make an API request.
+
+      _ = job.result()  # Wait for the job to complete.
+
+      return str(job.destination)
 
 
 @dataclasses.dataclass

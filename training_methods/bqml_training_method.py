@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 from google.cloud import bigquery
 
+import constants
 import utils
 from models import dataset, forecast_job_request
 from training_methods import training_method
@@ -99,7 +100,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             )
 
         if forecast_horizon is None:
-            raise ValueError(f"Missing argument: forecast_horizon")
+            raise ValueError(f"Missing argument: {FORECAST_HORIZON_PARAMETER}")
 
         # Start training
         query_job = self._train(
@@ -132,17 +133,27 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
 
         return str(query_job.destination)
 
-    def predict(self, model: str, prediction_parameters: Dict[str, Any]) -> str:
+    def predict(
+        self,
+        model: str,
+        model_parameters: Dict[str, Any],
+        prediction_parameters: Dict[str, Any],
+    ) -> str:
         """Predict using a model and return the BigQuery URI to its prediction table.
 
         Args:
             model (str): Model to evaluate.
+            model_parameters (Dict[str, Any]): The model training parameters.
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The BigQuery prediction table URI.
         """
-        query_job = self._predict(model=model, parameters=prediction_parameters)
+        query_job = self._predict(
+            model=model,
+            model_parameters=model_parameters,
+            prediction_parameters=prediction_parameters,
+        )
 
         # Wait for result
         _ = query_job.result()
@@ -221,7 +232,9 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
 
         query = f"""
             SELECT
-            *
+                {time_series_id_column} as {constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN},
+                forecast_timestamp as {constants.FORECAST_TIME_COLUMN},
+                forecast_value as {constants.FORECAST_TARGET_COLUMN}
             FROM
             ML.FORECAST(MODEL `{model}`,
                         STRUCT({forecast_horizon} AS horizon, 0.8 AS confidence_level))

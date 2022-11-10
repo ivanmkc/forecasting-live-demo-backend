@@ -51,18 +51,11 @@ def save_dataframe_to_bigquery(
   bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
   bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
 
-  # dataframe.to_gbq(
-  #   f"{dataset_id}.{table_name}",
-  #   project_id=project_id,
-  #   if_exists='replace'
-  #   )
-
   job_config = bigquery.LoadJobConfig(
         # Specify a (partial) schema. All columns are always written to the
         # table. The schema is used to assist in data type definitions.
         schema=[
             bigquery.SchemaField("date", bigquery.enums.SqlTypeNames.DATE),
-            # bigquery.SchemaField("sales", bigquery.enums.SqlTypeNames.st),
         ],
         # Optionally, set the write disposition. BigQuery appends loaded rows
         # to an existing table by default, but with WRITE_TRUNCATE write
@@ -75,12 +68,35 @@ def save_dataframe_to_bigquery(
       dataframe=dataframe,
       destination=f"{project_id}.{dataset_id}.{table_name}",
       job_config=job_config,
-  )  # Make an API request.
+  )
 
   job.result()
-  # bq_uri = f"bq://{project_id}.{dataset_id}.{table_name}"
 
   return str(job.destination)
+
+
+def rename_bq_table_column(
+  table_id: str,
+  old_column_name: str,
+  new_column_name: str
+  ) -> bigquery.QueryJob:
+  """This function renames a column name in a bigquery table.
+
+  Args:
+      table_id (str): Id of the table in which the column is renamed
+      old_column_name (str): The current name of the column to be renamed
+      new_column_name (str): The new column name
+
+  Returns:
+      bigquery.QueryJob: The query job of the altering the table
+  """
+  query = f"ALTER TABLE {table_id} \
+        RENAME COLUMN {old_column_name} TO {new_column_name};"
+
+  client = bigquery.Client()
+  job = client.query(query=query)
+
+  return job
 
 
 
