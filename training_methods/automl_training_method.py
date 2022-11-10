@@ -85,8 +85,8 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         """Train a job and return the model URI.
 
         Args:
-            dataset (dataset.Dataset): Input timeseries dataset.
-            parameters (Dict[str, Any]): The model training parameters.
+            dataset (dataset.Dataset): Input dataset.
+            model_parameters (Dict[str, Any]): The model training parameters.
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
@@ -160,6 +160,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
     def predict(
         self,
+        dataset: dataset.Dataset,
         model: str,
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
@@ -168,29 +169,38 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         table.
 
         Args:
+            dataset (dataset.Dataset): Input dataset.
             model (str): Model to evaluate.
-            parameters (Dict[str, Any]): The prediction parameters.
+            model_parameters (Dict[str, Any]): The model training parameters.
+            prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
             str: The BigQuery prediction table ID.
         """
         forecast_horizon = prediction_parameters.get(FORECAST_HORIZON_PARAMETER)
         context_window = prediction_parameters.get(CONTEXT_WINDOW_PARAMETER)
-        bigquery_source = prediction_parameters.get("bigquerySource")
+        time_column = model_parameters.get(TIME_COLUMN_PARAMETER)
 
         if forecast_horizon is None:
             raise ValueError(f"Missing argument: {FORECAST_HORIZON_PARAMETER}")
 
-        if bigquery_source is None:
-            raise ValueError(f"Missing argument: bigquery_source")
-
         if context_window is None:
             raise ValueError(f"Missing argument: {CONTEXT_WINDOW_PARAMETER}")
+
+        if time_column is None:
+            raise ValueError(f"Missing argument: {TIME_COLUMN_PARAMETER}")
+
+        # Get test data bigquery source uri
+        test_bq_source = dataset.get_bigquery_table_id(
+            time_column=time_column, dataset_portion="test"
+        )
+        test_bq_source = f"bq://{test_bq_source}"
 
         processed_dataset_bq_source = self._prepare_test_dataset(
             context_window=context_window,
             forecast_horizon=forecast_horizon,
-            bigquery_source=bigquery_source,
+            model_parameters=model_parameters,
+            bigquery_source=test_bq_source,
         )
 
         job = self._predict(
@@ -206,15 +216,15 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         target_column_name = model_parameters.get(TARGET_COLUMN_PARAMETER)
 
         if target_column_name is None:
-          raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
+            raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
 
         old_column_name = f"predicted_{target_column_name}"
         new_column_name = constants.FORECAST_TARGET_COLUMN
 
         job = utils.rename_bq_table_column(
-          table_id=bq_output_table_id,
-          old_column_name=old_column_name,
-          new_column_name=new_column_name
+            table_id=bq_output_table_id,
+            old_column_name=old_column_name,
+            new_column_name=new_column_name,
         )
         _ = job.result()
 
@@ -236,12 +246,19 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         uuid = utils.generate_uuid()
 
+        # Get training data bigquery source uri
+        train_bq_source = dataset.get_bigquery_table_id(
+            time_column=time_column, dataset_portion="train"
+        )
+        train_bq_source = f"bq://{train_bq_source}"
+
         # Create Vertex AI time series dataset
         timeseries_dataset = aiplatform.TimeSeriesDataset.create(
-            display_name=f"sales_forecasting_train_{uuid}",
-            bq_source=f"bq://{dataset.get_bigquery_uri(time_column=time_column)}",
+            display_name=f"timeseries_{uuid}",
+            bq_source=train_bq_source,
         )
 
+        # Create AutoML forecasting training job
         training_job = aiplatform.AutoMLForecastingTrainingJob(
             display_name=f"automl-job-{uuid}",
             optimization_objective=optimization_objective,
@@ -340,7 +357,11 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         return batch_prediction_job
 
     def _prepare_test_dataset(
-        self, context_window: int, forecast_horizon: int, bigquery_source: str
+        self,
+        context_window: int,
+        forecast_horizon: int,
+        model_parameters: Dict[str, Any],
+        bigquery_source: str,
     ) -> str:
         """This function does the prerocessing job on the test data and
         saves the result in a bigquery table
@@ -350,6 +371,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
               (and for forecasts).
             forecast_horizon (int): Determines how far into the future the model
               forecasts the target value for each row of prediction data.
+            model_parameters (Dict[str, Any]): The model training parameters.
             bigquery_source (str): BigQuery uri of the table to be processed in
               format bq://project-id.dataset-id.table-id
 
@@ -358,11 +380,14 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
               saved to in format bq://project-id.dataset-id.table-id
         """
 
+        time_column = model_parameters.get(TIME_COLUMN_PARAMETER)
+        target_column = model_parameters.get(TARGET_COLUMN_PARAMETER)
+
         # Download dataset from BigQuery
         df_test = utils.download_bq_table(bq_table_uri=bigquery_source)
-        df_test.sort_values(by="date_index", inplace=True)
-        df_test["date"] = pd.to_datetime(df_test["date"]).dt.normalize()
-        start_date = df_test.iloc[0]["date"]
+        df_test.sort_values(by=time_column, inplace=True)
+        df_test[time_column] = pd.to_datetime(df_test[time_column]).dt.normalize()
+        start_date = df_test.iloc[0][time_column]
 
         # Store start and end dates for context and horizon
         date_context_window_start = start_date
@@ -373,16 +398,16 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         # Extract dataframes for context and horizon
         df_test_context = df_test[
-            (df_test["date"] >= date_context_window_start)
-            & (df_test["date"] < date_context_window_end)
+            (df_test[time_column] >= date_context_window_start)
+            & (df_test[time_column] < date_context_window_end)
         ]
         df_test_horizon = df_test[
-            (df_test["date"] >= date_context_window_end)
-            & (df_test["date"] < time_horizon_end)
+            (df_test[time_column] >= date_context_window_end)
+            & (df_test[time_column] < time_horizon_end)
         ].copy()
 
-        # Remove sales for horizon (i.e. future dates)
-        df_test_horizon["sales"] = None
+        # Remove target for horizon (i.e. future dates)
+        df_test_horizon[target_column] = None
 
         # Write test data to CSV
         df_test = pd.concat([df_test_context, df_test_horizon])

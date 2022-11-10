@@ -93,6 +93,7 @@ class TrainingMethod(abc.ABC):
     @abc.abstractmethod
     def predict(
         self,
+        dataset: dataset.Dataset,
         model: str,
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
@@ -101,6 +102,7 @@ class TrainingMethod(abc.ABC):
         prediction table.
 
         Args:
+            dataset (dataset.Dataset): The dataset used for prediction.
             model (str): Model to evaluate.
             model_parameters (Dict[str, Any]): The model training parameters.
             prediction_parameters (Dict[str, Any]): The prediction parameters.

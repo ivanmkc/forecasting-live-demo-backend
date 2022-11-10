@@ -1,8 +1,7 @@
 import abc
 import dataclasses
-import uuid
 from datetime import datetime
-from functools import cached_property
+from functools import cached_property, cache
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
 
@@ -20,7 +19,7 @@ class Dataset(abc.ABC):
     icon: Optional[str]
     recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]]
     recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]]
-    test_percentage: int=0.2
+    train_percentage: int = 0.8
 
     @property
     @abc.abstractmethod
@@ -54,6 +53,37 @@ class Dataset(abc.ABC):
 
         return time_values.max()
 
+    @cached_property
+    def date_cutoff(self) -> datetime:
+        # The cut-off date for dataset train/test split
+        df = self.df
+        dates_unique = df[self.time_column].unique()
+        date_cutoff = sorted(dates_unique)[
+            round(len(dates_unique) * self.train_percentage)
+        ]
+
+        return date_cutoff
+
+    @property
+    def df_train(self) -> pd.DataFrame:
+        df = self.df
+        df[self.time_column] = df[self.time_column].astype("datetime64[ns]")
+
+        # Split dataset based on date cut-off
+        df_train = df[df[self.time_column] < self.date_cutoff]
+
+        return df_train
+
+    @property
+    def df_test(self) -> pd.DataFrame:
+        df = self.df
+        df[self.time_column] = df[self.time_column].astype("datetime64[ns]")
+
+        # Split dataset based on date cut-off
+        df_test = df[df[self.time_column] > self.date_cutoff]
+
+        return df_test
+
     def as_response(self) -> Dict:
         df_preview = self.df_preview.fillna("").sort_values(self.time_column)
         df_preview["id"] = df_preview.index
@@ -71,53 +101,64 @@ class Dataset(abc.ABC):
             "recommendedPredictionParameters": self.recommended_prediction_parameters,
         }
 
-    def get_bigquery_uri(
-        self,
-        time_column: str,
-        dataset_portion: str
+    @cache
+    def get_bigquery_table_id(
+        self, time_column: str, dataset_portion: Optional[str] = None
     ) -> str:
-      """_summary_
+        """This function saves the dataset on BigQuery and returns the BigQuery
+            bigquery distenation table uri.
 
-      Args:
-          time_column (str): _description_
-          dataset_portion (str): `test` or `train`
+        Args:
+            time_column (str): Dataset time column name
+            dataset_portion (str): `test` or `train`. This will return the
+              main dataset (before split) if the data portion is None.
 
-      Returns:
-          str: _description_
-      """
+        Returns:
+            str: BigQuery destination table ID.
+        """
 
-      dataset_id = utils.generate_uuid()
-      table_id = utils.generate_uuid()
+        dataset_id = utils.generate_uuid()
+        table_id = utils.generate_uuid()
 
-      # Write dataset to BigQuery table
-      client = bigquery.Client()
-      project_id = client.project
+        # Write dataset to BigQuery table
+        client = bigquery.Client()
+        project_id = client.project
 
-      bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
-      bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
+        bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
+        bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
 
-      job_config = bigquery.LoadJobConfig(
-          # Specify a (partial) schema. All columns are always written to the
-          # table. The schema is used to assist in data type definitions.
-          schema=[
-              bigquery.SchemaField(time_column, bigquery.enums.SqlTypeNames.DATE),
-          ],
-          # Optionally, set the write disposition. BigQuery appends loaded rows
-          # to an existing table by default, but with WRITE_TRUNCATE write
-          # disposition it replaces the table with the loaded data.
-          write_disposition="WRITE_TRUNCATE",
-      )
+        job_config = bigquery.LoadJobConfig(
+            # Specify a (partial) schema. All columns are always written to the
+            # table. The schema is used to assist in data type definitions.
+            schema=[
+                bigquery.SchemaField(time_column, bigquery.enums.SqlTypeNames.DATE),
+            ],
+            # Optionally, set the write disposition. BigQuery appends loaded rows
+            # to an existing table by default, but with WRITE_TRUNCATE write
+            # disposition it replaces the table with the loaded data.
+            write_disposition="WRITE_TRUNCATE",
+        )
 
-      # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
-      job = client.load_table_from_dataframe(
-          dataframe=self.df,
-          destination=f"{project_id}.{dataset_id}.{table_id}",
-          job_config=job_config,
-      )  # Make an API request.
+        # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
+        df = pd.DataFrame()
+        if dataset_portion == "train":
+            df = self.df_train
+        elif dataset_portion == "test":
+            df = self.df_test
+        elif dataset_portion is None:
+            df = self.df
+        else:
+            raise ValueError(f"Unknown dataset portion: {dataset_portion}")
 
-      _ = job.result()  # Wait for the job to complete.
+        job = client.load_table_from_dataframe(
+            dataframe=df,
+            destination=f"{project_id}.{dataset_id}.{table_id}",
+            job_config=job_config,
+        )  # Make an API request.
 
-      return str(job.destination)
+        _ = job.result()  # Wait for the job to complete.
+
+        return str(job.destination)
 
 
 @dataclasses.dataclass

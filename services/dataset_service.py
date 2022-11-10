@@ -5,7 +5,7 @@ from models import dataset
 
 DATASETS = [
     dataset.CSVDataset(
-        "sample_data/sales_forecasting_train.csv",
+        "sample_data/sales_forecasting.csv",
         display_name="Retail Sales",
         time_column="date",
         description="This is sales data from a fictional sporting goods company with several stores across the city. It includes sales data for several products, grouped in several categories.",
