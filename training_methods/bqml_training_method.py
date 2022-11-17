@@ -149,7 +149,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
-            str: The BigQuery prediction table URI.
+            str: The BigQuery prediction table ID.
         """
         query_job = self._predict(
             model=model,

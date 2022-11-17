@@ -5,12 +5,13 @@ import pandas as pd
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 import constants
 from services import dataset_service, forecast_job_coordinator, forecast_job_service
 from training_methods import (
-    bqml_training_method,
     automl_training_method,
+    bqml_training_method,
     debug_training_method,
     training_method,
 )
@@ -50,6 +51,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.get("/datasets")
@@ -188,7 +190,7 @@ async def evaluation(job_id: str):
 
         output = {
             "columns": columns,
-            "rows": evaluation.to_dict(orient="records"),
+            "rows": evaluation.astype(str).to_dict(orient="records"),
         }
 
         return output
@@ -200,23 +202,35 @@ def format_for_plotly(
     target_column: str,
     data: pd.DataFrame,
 ) -> List[Dict[str, Any]]:
-    data_grouped = data.groupby(time_series_identifier_column)
+    data_grouped = data.sort_values([time_column]).groupby(
+        time_series_identifier_column
+    )
 
-    group_time_value_map = {
-        k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
-        for k, v in data_grouped
-    }
+    # group_time_value_map = {
+    #     k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
+    #     for k, v in data_grouped
+    # }
 
-    unique_times = sorted(list(data[time_column].unique()))
+    # unique_times = sorted(list(data[time_column].unique()))
+
+    # return [
+    #     {
+    #         "x": unique_times,
+    #         "y": [time_values_map[time] for time in unique_times],
+    #         "name": group,
+    #         "mode": "lines",
+    #     }
+    #     for group, time_values_map in group_time_value_map.items()
+    # ]
 
     return [
         {
-            "x": unique_times,
-            "y": [time_values_map[time] for time in unique_times],
             "name": group,
             "mode": "lines",
+            "x": data_for_group[time_column].tolist(),
+            "y": data_for_group[target_column].tolist(),
         }
-        for group, time_values_map in group_time_value_map.items()
+        for (group, data_for_group) in data_grouped
     ]
 
 
@@ -264,7 +278,7 @@ async def prediction(job_id: str, output_type: str):
     job_request = training_jobs_manager_instance.get_request(job_id=job_id)
 
     if job_request is None:
-        raise HTTPException(status_code=404, detail=f"Job request not found: {job_id}")
+        raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
 
     # Fetch dataframes
     try:
@@ -301,6 +315,9 @@ async def prediction(job_id: str, output_type: str):
         raise HTTPException(status_code=404, detail=f"Prediction not found: {job_id}")
     else:
         df_prediction = df_prediction.fillna("")
+        # TODO Move the next line to a better place :D
+        df_prediction[time_column] = pd.to_datetime(df_prediction[time_column])
+
         if output_type == "datagrid":
             df_prediction["id"] = df_prediction.index
 

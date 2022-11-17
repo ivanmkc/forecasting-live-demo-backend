@@ -101,7 +101,7 @@ class Dataset(abc.ABC):
             "recommendedPredictionParameters": self.recommended_prediction_parameters,
         }
 
-    @cache
+    # @cache
     def get_bigquery_table_id(
         self, time_column: str, dataset_portion: Optional[str] = None
     ) -> str:

@@ -175,11 +175,15 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
-            str: The BigQuery prediction table ID.
+            str: The BigQuery prediction table view ID.
         """
         forecast_horizon = prediction_parameters.get(FORECAST_HORIZON_PARAMETER)
         context_window = prediction_parameters.get(CONTEXT_WINDOW_PARAMETER)
         time_column = model_parameters.get(TIME_COLUMN_PARAMETER)
+        time_series_id_column = model_parameters.get(
+            TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER
+        )
+        target_column_name = model_parameters.get(TARGET_COLUMN_PARAMETER)
 
         if forecast_horizon is None:
             raise ValueError(f"Missing argument: {FORECAST_HORIZON_PARAMETER}")
@@ -190,45 +194,48 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         if time_column is None:
             raise ValueError(f"Missing argument: {TIME_COLUMN_PARAMETER}")
 
+        if target_column_name is None:
+            raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
+
         # Get test data bigquery source uri
-        test_bq_source = dataset.get_bigquery_table_id(
+        test_bq_source_id = dataset.get_bigquery_table_id(
             time_column=time_column, dataset_portion="test"
         )
-        test_bq_source = f"bq://{test_bq_source}"
 
         processed_dataset_bq_source = self._prepare_test_dataset(
             context_window=context_window,
             forecast_horizon=forecast_horizon,
             model_parameters=model_parameters,
-            bigquery_source=test_bq_source,
+            bigquery_source=f"bq://{test_bq_source_id}",
         )
 
-        job = self._predict(
+        prediction_table_id = self._predict(
             model_name=model, bigquery_source=processed_dataset_bq_source
         )
 
-        output_dataset = job.output_info.bigquery_output_dataset
-        output_dataset = output_dataset.replace("bq://", "")
-        output_table = job.output_info.bigquery_output_table
-        bq_output_table_id = f"{output_dataset}.{output_table}"
+        # Get the prediction dataset id
+        prediction_dataset_id = ""
+        if prediction_table_id is None:
+            raise ValueError("Prediction table id is null!")
+        else:
+            prediction_dataset_id = prediction_table_id.split(".")[1]
 
-        # Rename prediction column name
-        target_column_name = model_parameters.get(TARGET_COLUMN_PARAMETER)
+        # Create a view and rename column names in the prediction table
+        client = bigquery.Client()
+        view_id = f"{client.project}.{prediction_dataset_id}.{utils.generate_uuid()}"
+        view = bigquery.Table(view_id)
 
-        if target_column_name is None:
-            raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
+        view.view_query = f"""
+            SELECT
+              {time_series_id_column} as
+                {constants.FORECAST_TIME_SERIES_IDENTIFIER_COLUMN},
+              {time_column} as {constants.FORECAST_TIME_COLUMN},
+              predicted_{target_column_name} as {constants.FORECAST_TARGET_COLUMN}
+            FROM `{prediction_table_id}`"""
 
-        old_column_name = f"predicted_{target_column_name}"
-        new_column_name = constants.FORECAST_TARGET_COLUMN
+        client.create_table(view)
 
-        job = utils.rename_bq_table_column(
-            table_id=bq_output_table_id,
-            old_column_name=old_column_name,
-            new_column_name=new_column_name,
-        )
-        _ = job.result()
-
-        return bq_output_table_id
+        return view_id
 
     def _train(
         self,
@@ -335,16 +342,23 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
                 f"Model evaluation data does not exist for model {model_name}!"
             )
 
-    def _predict(
-        self, model_name: str, bigquery_source: str
-    ) -> aiplatform.BatchPredictionJob:
+    def _predict(self, model_name: str, bigquery_source: str) -> str:
+        """This function runs the batch prediction job
+
+        Args:
+            model_name (str): The model used for batch prediciton.
+            bigquery_source (str): The BigQuery source URI for batch prediction.
+
+        Returns:
+            str: The table id of batch prediction results.
+        """
 
         client = bigquery.Client()
         project_id = client.project
 
         model = aiplatform.Model(model_name=model_name)
 
-        batch_prediction_job = model.batch_predict(
+        job = model.batch_predict(
             job_display_name=f"automl_forecasting_{utils.generate_uuid()}",
             bigquery_source=bigquery_source,
             instances_format="bigquery",
@@ -354,7 +368,12 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
             sync=True,
         )
 
-        return batch_prediction_job
+        output_dataset = job.output_info.bigquery_output_dataset
+        output_dataset = output_dataset.replace("bq://", "")
+        output_table = job.output_info.bigquery_output_table
+        bq_output_table_id = f"{output_dataset}.{output_table}"
+
+        return bq_output_table_id
 
     def _prepare_test_dataset(
         self,

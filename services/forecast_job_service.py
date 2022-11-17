@@ -74,6 +74,7 @@ class ForecastJobService:
 
             # Run prediction
             output.prediction_uri = training_method.predict(
+                dataset=request.dataset,
                 model=output.model_uri,
                 model_parameters=request.model_parameters,
                 prediction_parameters=request.prediction_parameters,
