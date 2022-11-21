@@ -67,7 +67,6 @@ class Dataset(abc.ABC):
     @cached_property
     def df_train(self) -> pd.DataFrame:
         df = self.df
-        df[self.time_column] = df[self.time_column].astype("datetime64[ns]")
 
         # Split dataset based on date cut-off
         df_train = df[df[self.time_column] <= self.date_cutoff]
@@ -77,7 +76,6 @@ class Dataset(abc.ABC):
     @cached_property
     def df_test(self) -> pd.DataFrame:
         df = self.df
-        df[self.time_column] = df[self.time_column].astype("datetime64[ns]")
 
         # Split dataset based on date cut-off
         df_test = df[df[self.time_column] > self.date_cutoff]
