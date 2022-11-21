@@ -23,10 +23,12 @@ COLUMN_SPECS_PARAMETER = "columnSpecs"
 TIME_SERIES_ATTRIBUTE_COLUMNS_PARAMETER = "timeSeriesAttributeColumns"
 CONTEXT_WINDOW_PARAMETER = "contextWindow"
 
-aiplatform.init()
-
 
 class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
+    def __init__(self) -> None:
+        super().__init__()
+        aiplatform.init()
+        
     @property
     def id(self) -> str:
         """A unique id representing this training method.
