@@ -196,6 +196,9 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         if time_column is None:
             raise ValueError(f"Missing argument: {TIME_COLUMN_PARAMETER}")
 
+        if time_series_id_column is None:
+            raise ValueError(f"Missing argument: {TIME_SERIES_IDENTIFIER_COLUMN_PARAMETER}")
+
         if target_column_name is None:
             raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
 
