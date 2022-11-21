@@ -407,6 +407,12 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         time_column = model_parameters.get(TIME_COLUMN_PARAMETER)
         target_column = model_parameters.get(TARGET_COLUMN_PARAMETER)
 
+        if time_column is None:
+            raise ValueError(f"Missing argument: {TIME_COLUMN_PARAMETER}")
+
+        if target_column is None:
+            raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
+
         # Download dataset from BigQuery
         df_test = utils.download_bq_table(bq_table_uri=bigquery_source)
         df_test.sort_values(by=time_column, inplace=True)
