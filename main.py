@@ -206,23 +206,6 @@ def format_for_plotly(
         time_series_identifier_column
     )
 
-    # group_time_value_map = {
-    #     k: dict(zip(v[time_column].tolist(), v[target_column].tolist()))
-    #     for k, v in data_grouped
-    # }
-
-    # unique_times = sorted(list(data[time_column].unique()))
-
-    # return [
-    #     {
-    #         "x": unique_times,
-    #         "y": [time_values_map[time] for time in unique_times],
-    #         "name": group,
-    #         "mode": "lines",
-    #     }
-    #     for group, time_values_map in group_time_value_map.items()
-    # ]
-
     return [
         {
             "name": group,
