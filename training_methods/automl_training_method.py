@@ -202,7 +202,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         if target_column_name is None:
             raise ValueError(f"Missing argument: {TARGET_COLUMN_PARAMETER}")
 
-        # Get test data bigquery source uri
+        # Get test data BigQuery source uri
         test_bq_source_id = dataset.get_bigquery_table_id(
             time_column=time_column, dataset_portion="test"
         )
@@ -258,7 +258,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
 
         uuid = utils.generate_uuid()
 
-        # Get training data bigquery source uri
+        # Get training data BigQuery source uri
         train_bq_source = dataset.get_bigquery_table_id(
             time_column=time_column, dataset_portion="train"
         )
@@ -388,7 +388,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         bigquery_source: str,
     ) -> str:
         """This function does the prerocessing job on the test data and
-        saves the result in a bigquery table
+        saves the result in a BigQuery table
 
         Args:
             context_window (int): Sets how far back the model looks during training
@@ -436,7 +436,7 @@ class AutoMLForecastingTrainingMethod(training_method.TrainingMethod):
         # Write test data to CSV
         df_test = pd.concat([df_test_context, df_test_horizon])
 
-        # Load the data to bigquery
+        # Load the data to BigQuery
         destination_table = utils.save_dataframe_to_bigquery(
             dataframe=df_test, table_name="processed-test-data"
         )
