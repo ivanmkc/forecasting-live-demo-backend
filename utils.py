@@ -71,25 +71,3 @@ def save_dataframe_to_bigquery(dataframe: pd.DataFrame, table_name: str) -> str:
     job.result()
 
     return str(job.destination)
-
-
-def rename_bq_table_column(
-    table_id: str, old_column_name: str, new_column_name: str
-) -> bigquery.QueryJob:
-    """This function renames a column name in a bigquery table.
-
-    Args:
-        table_id (str): Id of the table in which the column is renamed
-        old_column_name (str): The current name of the column to be renamed
-        new_column_name (str): The new column name
-
-    Returns:
-        bigquery.QueryJob: The query job of the altering the table
-    """
-    query = f"ALTER TABLE {table_id} \
-          RENAME COLUMN {old_column_name} TO {new_column_name};"
-
-    client = bigquery.Client()
-    job = client.query(query=query)
-
-    return job
