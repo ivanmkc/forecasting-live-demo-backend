@@ -1,8 +1,7 @@
 import abc
 import dataclasses
-import uuid
 from datetime import datetime
-from functools import cached_property
+from functools import cached_property, cache
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
 
@@ -20,6 +19,7 @@ class Dataset(abc.ABC):
     icon: Optional[str]
     recommended_model_parameters: Optional[Dict[str, Dict[str, Any]]]
     recommended_prediction_parameters: Optional[Dict[str, Dict[str, Any]]]
+    train_percentage: int = 0.8
 
     @property
     @abc.abstractmethod
@@ -53,6 +53,35 @@ class Dataset(abc.ABC):
 
         return time_values.max()
 
+    @cached_property
+    def date_cutoff(self) -> datetime:
+        # The cut-off date for dataset train/test split
+        df = self.df
+        dates_unique = df[self.time_column].unique()
+        date_cutoff = sorted(dates_unique)[
+            round(len(dates_unique) * self.train_percentage)
+        ]
+
+        return date_cutoff
+
+    @cached_property
+    def df_train(self) -> pd.DataFrame:
+        df = self.df
+
+        # Split dataset based on date cut-off
+        df_train = df[df[self.time_column] <= self.date_cutoff]
+
+        return df_train
+
+    @cached_property
+    def df_test(self) -> pd.DataFrame:
+        df = self.df
+
+        # Split dataset based on date cut-off
+        df_test = df[df[self.time_column] > self.date_cutoff]
+
+        return df_test
+
     def as_response(self) -> Dict:
         df_preview = self.df_preview.fillna("").sort_values(self.time_column)
         df_preview["id"] = df_preview.index
@@ -70,10 +99,22 @@ class Dataset(abc.ABC):
             "recommendedPredictionParameters": self.recommended_prediction_parameters,
         }
 
-    def get_bigquery_uri(
-        self,
-        time_column: str,
+    # @cache
+    def get_bigquery_table_id(
+        self, time_column: str, dataset_portion: Optional[str] = None
     ) -> str:
+        """This function saves the dataset on BigQuery and returns the BigQuery
+            bigquery distenation table uri.
+
+        Args:
+            time_column (str): Dataset time column name
+            dataset_portion (str): `test` or `train`. This will return the
+              main dataset (before split) if the data portion is None.
+
+        Returns:
+            str: BigQuery destination table ID.
+        """
+
         dataset_id = utils.generate_uuid()
         table_id = utils.generate_uuid()
 
@@ -97,8 +138,18 @@ class Dataset(abc.ABC):
         )
 
         # Reference: https://cloud.google.com/bigquery/docs/samples/bigquery-load-table-dataframe
+        df = pd.DataFrame()
+        if dataset_portion == "train":
+            df = self.df_train
+        elif dataset_portion == "test":
+            df = self.df_test
+        elif dataset_portion is None:
+            df = self.df
+        else:
+            raise ValueError(f"Unknown dataset portion: {dataset_portion}")
+
         job = client.load_table_from_dataframe(
-            dataframe=self.df,
+            dataframe=df,
             destination=f"{project_id}.{dataset_id}.{table_id}",
             job_config=job_config,
         )  # Make an API request.

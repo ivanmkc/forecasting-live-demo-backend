@@ -100,7 +100,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
             )
 
         if forecast_horizon is None:
-            raise ValueError(f"Missing argument: forecast_horizon")
+            raise ValueError(f"Missing argument: {FORECAST_HORIZON_PARAMETER}")
 
         # Start training
         query_job = self._train(
@@ -135,6 +135,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
 
     def predict(
         self,
+        dataset: dataset.Dataset,
         model: str,
         model_parameters: Dict[str, Any],
         prediction_parameters: Dict[str, Any],
@@ -142,12 +143,13 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         """Predict using a model and return the BigQuery URI to its prediction table.
 
         Args:
+            dataset (dataset.Dataset): Input dataset.
             model (str): Model to evaluate.
             model_parameters (Dict[str, Any]): The model training parameters.
             prediction_parameters (Dict[str, Any]): The prediction parameters.
 
         Returns:
-            str: The BigQuery prediction table URI.
+            str: The BigQuery prediction table ID.
         """
         query_job = self._predict(
             model=model,
@@ -176,7 +178,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
         bq_dataset = bigquery.Dataset(f"{project_id}.{dataset_id}")
         bq_dataset = client.create_dataset(bq_dataset, exists_ok=True)
 
-        bigquery_uri = dataset.get_bigquery_uri(time_column=time_column)
+        bigquery_uri = dataset.get_bigquery_table_id(time_column=time_column)
 
         query = f"""
             CREATE OR REPLACE MODEL `{project_id}.{dataset_id}.bqml_arima`
@@ -237,7 +239,7 @@ class BQMLARIMAPlusTrainingMethod(training_method.TrainingMethod):
                 forecast_value as {constants.FORECAST_TARGET_COLUMN}
             FROM
             ML.FORECAST(MODEL `{model}`,
-                        STRUCT({forecast_horizon} AS horizon, 0.8 AS confidence_level))            
+                        STRUCT({forecast_horizon} AS horizon, 0.8 AS confidence_level))
         """
 
         # Start the query job
