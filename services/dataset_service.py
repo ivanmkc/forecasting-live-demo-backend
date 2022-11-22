@@ -17,11 +17,36 @@ DATASETS = [
                 "timeSeriesIdentifierColumn": "product_at_store",
                 "dataGranularityUnit": "day",
                 "dataGranularityCount": 1,
+            },
+            "automl-forecasting": {
+                "targetColumn": "sales",
+                "timeColumn": "date",
+                "timeSeriesIdentifierColumn": "product_at_store",
+                "dataGranularityUnit": "day",
+                "dataGranularityCount": 1,
+                "timeSeriesAttributeColumns": [
+                  "product_type",
+                  "product_category",
+                  "store",
+                  "product"
+                  ],
+                "columnSpecs": {
+                  "date": "timestamp",
+                  "sales": "numeric",
+                  "product_type": "categorical",
+                  "product_category": "categorical",
+                  "product": "categorical",
+                  "store": "categorical"
+                  }
             }
         },
         recommended_prediction_parameters={
             "bqml_arimaplus": {
                 "forecastHorizon": 120,
+            },
+            "automl-forecasting": {
+                "forecastHorizon": 30,
+                "contextWindow": 30
             }
         },
     ),
