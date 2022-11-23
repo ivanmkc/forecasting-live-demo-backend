@@ -12,6 +12,12 @@
             "console": "integratedTerminal",
             "justMyCode": true
         },
+        {            
+            "name": "Add licenses",
+            "request": "launch",
+            "type": "node-terminal",
+            "command": "docker run -it -v ${PWD}:/src ghcr.io/google/addlicense src",
+        },
         {
             "name": "Start local server (uvicorn)",
             "type": "python",
