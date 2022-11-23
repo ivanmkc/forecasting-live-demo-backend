@@ -67,26 +67,6 @@ DATASETS = [
             }
         },
     ),
-    # dataset.CSVDataset(
-    #     "sample_data/cloud_spend.csv",
-    #     display_name="Cloud Spend",
-    #     time_column="date",
-    #     description="This is exported Cloud Billing dataset from a sample GCP analytics use case project.",
-    #     icon="cloud",
-    #     recommended_model_parameters={
-    #         "bqml_arimaplus": {
-    #             "targetColumn": "cost",
-    #             "timeColumn": "date",
-    #             "timeSeriesIdentifierColumn": "project_name_and_service",
-    #             "dataFrequency": "daily",
-    #         }
-    #     },
-    #     recommended_prediction_parameters={
-    #         "bqml_arimaplus": {
-    #             "forecastHorizon": 120,
-    #         }
-    #     },
-    # ),
 ]
 
 
