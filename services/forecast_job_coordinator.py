@@ -194,7 +194,6 @@ class MemoryTrainingJobCoordinator(ForecastJobCoordinator):
         Returns:
             List[ForecastJobRequest]: The pending jobs.
         """
-        # TODO: Add pagination
         return list(self._pending_jobs.values())
 
     def list_completed_jobs(self) -> List[completed_forecast_job.CompletedForecastJob]:
@@ -203,7 +202,6 @@ class MemoryTrainingJobCoordinator(ForecastJobCoordinator):
         Returns:
             List[forecast_job_result.ForecastJobResult]: The completed results.
         """
-        # TODO: Add pagination
         return list(self._completed_jobs.values())
 
     def _get_bigquery_table_as_df(self, table_id: str) -> pd.DataFrame:
