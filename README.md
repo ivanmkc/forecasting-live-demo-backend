@@ -15,6 +15,7 @@ In the project directory, you can run:
 ### Deployment
 
 Here are a few options on how to deploy the backend to your own Google Cloud project.
+Run these commands from the same folder as this README.md file.
 
 #### 1. Build and deploy to Google Cloud Run in one step
 
@@ -22,7 +23,7 @@ Here are a few options on how to deploy the backend to your own Google Cloud pro
 gcloud beta run deploy built-on-vertex-ai-backend --source . --region=us-central1 --platform=managed --cpu=2 --memory=8G --timeout=3600 --allow-unauthenticated --session-affinity --min-instances=1
 ```
 
-Package the frontend into a container using the Dockerfile, save it in the Google Container Registry and deploy it on Google Cloud Run.
+Package the backend app into a container using the Dockerfile, save it in the Google Container Registry and deploy it on Google Cloud Run.
 
 #### 2. Build a container using Google Cloud Build
 
@@ -30,7 +31,7 @@ Package the frontend into a container using the Dockerfile, save it in the Googl
 gcloud builds submit --tag gcr.io/your-project-name/built-on-vertex-ai-backend
 ```
 
-This uses the Dockerfile to build the frontend container and save it in the Google Container Registry.
+This uses the Dockerfile to build the container and save it in the Google Container Registry.
 This can then be deployed to Cloud Run or other platforms.
 
 See [Deploy a Python service to Cloud Run](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-python-service) for more information.
