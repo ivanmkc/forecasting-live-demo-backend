@@ -1,3 +1,17 @@
+# Copyright 2022 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 from typing import List, Optional
 
@@ -25,28 +39,45 @@ DATASETS = [
                 "dataGranularityUnit": "day",
                 "dataGranularityCount": 1,
                 "timeSeriesAttributeColumns": [
-                  "product_type",
-                  "product_category",
-                  "store",
-                  "product"
-                  ],
+                    "product_type",
+                    "product_category",
+                    "store",
+                    "product",
+                ],
                 "columnSpecs": {
-                  "date": "timestamp",
-                  "sales": "numeric",
-                  "product_type": "categorical",
-                  "product_category": "categorical",
-                  "product": "categorical",
-                  "store": "categorical"
-                  }
-            }
+                    "date": "timestamp",
+                    "sales": "numeric",
+                    "product_type": "categorical",
+                    "product_category": "categorical",
+                    "product": "categorical",
+                    "store": "categorical",
+                },
+            },
         },
         recommended_prediction_parameters={
             "bqml_arimaplus": {
                 "forecastHorizon": 120,
             },
-            "automl-forecasting": {
-                "forecastHorizon": 30,
-                "contextWindow": 30
+            "automl-forecasting": {"forecastHorizon": 30, "contextWindow": 30},
+        },
+    ),
+    dataset.CSVDataset(
+        "sample_data/iowa_liquor_sales.csv",
+        display_name="Iowa Liquor Sales",
+        time_column="date",
+        description="This dataset contains the spirits purchase information of Iowa Class “E” liquor licensees by product and date of purchase. This dataset was simplified for demonstration purposes.",
+        icon="liquor",
+        recommended_model_parameters={
+            "bqml_arimaplus": {
+                "targetColumn": "sale_dollars",
+                "timeColumn": "date",
+                "timeSeriesIdentifierColumn": "county_and_city",
+                "dataFrequency": "daily",
+            }
+        },
+        recommended_prediction_parameters={
+            "bqml_arimaplus": {
+                "forecastHorizon": 120,
             }
         },
     ),

@@ -12,6 +12,12 @@
             "console": "integratedTerminal",
             "justMyCode": true
         },
+        {            
+            "name": "Add licenses",
+            "request": "launch",
+            "type": "node-terminal",
+            "command": "docker run -it -v ${PWD}:/src ghcr.io/google/addlicense src",
+        },
         {
             "name": "Start local server (uvicorn)",
             "type": "python",
@@ -31,9 +37,9 @@
             "type": "node-terminal",
         },
         {
-            "name": "Cloud Run: Deploy docker image",
+            "name": "Cloud Run: Build and deploy docker image",
             "request": "launch",
-            "command": "gcloud beta run deploy forecasting-live-demo-backend --region=us-central1 --image=gcr.io/python-docs-samples-tests/forecasting-live-demo-backend:latest --platform=managed --cpu=2 --memory=8G --timeout=3600 --allow-unauthenticated --session-affinity --min-instances=1",
+            "command": "gcloud beta run deploy built-on-vertex-ai-backend --source . --region=us-central1 --platform=managed --cpu=2 --memory=8G --timeout=3600 --allow-unauthenticated --session-affinity --min-instances=1",
             "type": "node-terminal"
         },
     ]
